@@ -1,6 +1,6 @@
 # DavidWebb
 
-Lightweight Java HTTP-Client for calling JSON REST-Services (especially made for Android).
+Lightweight Java HTTP-Client for calling REST-Services
 
 ## Problem
 
@@ -19,7 +19,7 @@ If you have to call a RESTful Webservice from Java, especially if you are on And
 
 **DavidWebb** is a paper-thin wrapper around
 [HttpURLConnection](http://docs.oracle.com/javase/7/docs/api/java/net/HttpURLConnection.html).
-It supports most HTTP communication cases when you talk to REST services and your data is JSON. It is very
+It supports most HTTP communication cases when you talk to REST services. It is very
 lightweight (~18 KB jar) and super-easy to use.
 
 ## Features ##
@@ -28,7 +28,6 @@ lightweight (~18 KB jar) and super-easy to use.
   * add HTTP headers (per request, per client or globally)
   * convert params to `x-www-form-urlencoded` body **or** URI search params
   * fluent API
-  * org.json support (JSONObject, JSONArray) as payload in both directions (up/down)
   * wraps all Exceptions in a WebbException (a RuntimeException)
   * automatically sets many boiler-plate HTTP headers (like 'Accept', 'Content-Type', 'Content-Length')
   * GZip-compression for uploads (POST/PUT)
@@ -44,6 +43,7 @@ lightweight (~18 KB jar) and super-easy to use.
 
 Following features are not supported and there are no plans to realize them:
 
+  * JSON Support
   * Cookie management (read `Set-Cookie` header from response and set `Cookie` header for request).
     As DavidWebb is just a thin wrapper over HttpURLConnection, you can use `CookieManager`.
   * Comfortable Basic Authentication (it's not hard to implement it above of DavidWebb, see below)
@@ -58,8 +58,7 @@ the JAR, please create a pull request. (Adding heavy dependencies is not an opti
 
 # Usage Examples
 
-Below you can see some examples of how to use DavidWebb. And here you can find the
-[API Documentation](http://hgoebl.github.io/DavidWebb/apidocs/).
+Below you can see some examples of how to use DavidWebb.
 
 **This is some code from a SyncAdapter of an Android App:**
 
@@ -255,16 +254,6 @@ otherwise some tests will fail:
 
 There is a script (`src/test/android/run-tests-emulator.sh`) which also builds the test-app with gradle.
 
-## Coverage
-
-The test coverage is measured only with the JUnit-tests for JavaSE. As mocking is not easy
-to accomplish under Android/Dalvik, coverage is not measured for this runtime environment.
-
-  * Class: 100%
-  * Instructions: 90%
-  * Branches: 79%
-  * see [JaCoCo Coverage Report](http://hgoebl.github.io/DavidWebb/jacoco/)
-
 # TODO
 
 ## Features (planned)
@@ -280,13 +269,11 @@ to accomplish under Android/Dalvik, coverage is not measured for this runtime en
 
 Create an issue if you want to have one of those ideas implemented.
 
-## Documentation
-  * Create User-Guide
 
 ## Testing
   * Higher coverage
   * Test against httpbin.org
 
 # Contributors
-
  * [essobedo](https://github.com/essobedo)
+ * [Darkyenus](https://github.com/Darkyenus)
