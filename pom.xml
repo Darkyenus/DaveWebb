@@ -16,6 +16,13 @@
         <android.test.dir>${project.basedir}/src/test/android/libs</android.test.dir>
     </properties>
 
+    <repositories>
+        <repository>
+            <id>jitpack.io</id>
+            <url>https://jitpack.io</url>
+        </repository>
+    </repositories>
+
     <dependencies>
         <dependency>
             <groupId>junit</groupId>
@@ -27,6 +34,12 @@
             <groupId>org.mockito</groupId>
             <artifactId>mockito-core</artifactId>
             <version>1.9.5</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.github.EsotericSoftware</groupId>
+            <artifactId>jsonbeans</artifactId>
+            <version>cb0f3406fc</version>
             <scope>test</scope>
         </dependency>
     </dependencies>

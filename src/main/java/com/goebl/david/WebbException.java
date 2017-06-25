@@ -32,7 +32,8 @@ public final class WebbException extends RuntimeException {
      *
      * @return the <code>Response</code> object filled with error information like statusCode and errorBody.
      */
-    public Response getResponse() {
+    public <T> Response<T> getResponse() {
+        //noinspection unchecked
         return response;
     }
 }

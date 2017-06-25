@@ -18,19 +18,31 @@ public interface ResponseTranslator<Type> {
      *
      * @param in stream, never null. Doesn't have to be closed.
      */
-    Type decode(Response<Type> response, InputStream in) throws Exception;
+    Type decode(Response response, InputStream in) throws Exception;
+
+    /**
+     * Parallel to {@link #decode(Response, InputStream)}, but called when there is no data and <code>in</code> would
+     * be null. (This does not guarantee that the stream in decode() will contain any data!)
+     *
+     * This method MUST be thread safe and work correctly when invoked from ANY thread!!!
+     */
+    Type decodeEmptyBody(Response response) throws Exception;
 
     ResponseTranslator<String> STRING_TRANSLATOR = new ResponseTranslator<String>() {
-        public String decode(Response<String> response, InputStream in) throws Exception {
+
+        public String decode(Response response, InputStream in) throws Exception {
             String encoding = WebbConst.UTF8;
-            final String[] parts = response.getContentType().replaceAll("\\s", "").split(";");
-            for (String part : parts) {
-                final String prefix = "charset=";
-                if (part.startsWith(prefix)) {
-                    final String charset = part.substring(prefix.length());
-                    if (Charset.isSupported(charset)) {
-                        encoding = charset;
-                        break;
+            final String contentType = response.getContentType();
+            if (contentType != null) {
+                final String[] parts = contentType.replaceAll("\\s", "").split(";");
+                for (String part : parts) {
+                    final String prefix = "charset=";
+                    if (part.startsWith(prefix)) {
+                        final String charset = part.substring(prefix.length());
+                        if (Charset.isSupported(charset)) {
+                            encoding = charset;
+                            break;
+                        }
                     }
                 }
             }
@@ -44,6 +56,21 @@ public interface ResponseTranslator<Type> {
             }
 
             return sb.toString();
+        }
+
+        public String decodeEmptyBody(Response response) throws Exception {
+            return "";
+        }
+    };
+
+    ResponseTranslator<byte[]> BYTES_TRANSLATOR = new ResponseTranslator<byte[]>(){
+
+        public byte[] decode(Response response, InputStream in) throws Exception {
+            return WebbUtils.readBytes(in);
+        }
+
+        public byte[] decodeEmptyBody(Response response) throws Exception {
+            return WebbConst.EMPTY_BYTE_ARRAY;
         }
     };
 }

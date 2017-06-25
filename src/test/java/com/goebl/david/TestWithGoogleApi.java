@@ -1,8 +1,7 @@
 package com.goebl.david;
 
+import com.esotericsoftware.jsonbeans.JsonValue;
 import junit.framework.TestCase;
-import org.json.JSONArray;
-import org.json.JSONObject;
 
 /**
  * Real world testing a Google API.
@@ -38,6 +37,8 @@ public class TestWithGoogleApi extends TestCase {
         public String toString() {
             return (latitudeE6 / 1e6) + "," + (longitudeE6 / 1e6);
         }
+
+
     }
 
     public void testGetDistance() throws Exception {
@@ -45,25 +46,25 @@ public class TestWithGoogleApi extends TestCase {
         GeoPoint src = new GeoPoint(47.8227, 12.096933);
         GeoPoint dest = new GeoPoint(47.8633, 12.215533);
 
-        Webb webb = Webb.create();
-        JSONObject result = webb
+        Webb webb = new Webb(null);
+        JsonValue result = webb
                 .get("http://maps.googleapis.com/maps/api/directions/json")
                 .param("origin", src)
                 .param("destination", dest)
                 .param("mode", "walking")
                 .param("sensor", "true")
                 .ensureSuccess()
-                .asJsonObject()
+                .execute(AbstractTestWebb.JSON_TRANSLATOR)
                 .getBody();
 
         assertNotNull(result);
         // System.out.println(result.toString(2));
 
-        JSONArray array = result.getJSONArray("routes");
-        JSONObject routes = array.getJSONObject(0);
-        JSONArray legs = routes.getJSONArray("legs");
-        JSONObject steps = legs.getJSONObject(0);
-        JSONObject distance = steps.getJSONObject("distance");
+        JsonValue array = result.get("routes");
+        JsonValue routes = array.get(0);
+        JsonValue legs = routes.get("legs");
+        JsonValue steps = legs.get(0);
+        JsonValue distance = steps.get("distance");
 
         int iDistance = distance.getInt("value");
         // System.out.println(distance.toString());

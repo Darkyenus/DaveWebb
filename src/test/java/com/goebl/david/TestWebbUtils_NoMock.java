@@ -1,18 +1,10 @@
 package com.goebl.david;
 
 import junit.framework.TestCase;
-import org.json.JSONArray;
-import org.json.JSONObject;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.text.DateFormat;
-import java.util.Arrays;
-import java.util.Calendar;
-import java.util.Date;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.TimeZone;
+import java.util.*;
 import java.util.zip.GZIPInputStream;
 
 public class TestWebbUtils_NoMock extends TestCase {
@@ -61,51 +53,6 @@ public class TestWebbUtils_NoMock extends TestCase {
         // instead of '+' for space '%20' is valid as well; in case of problems adapt test
         assertEquals("Hello%2FWorld+%26+Co.%3F", WebbUtils.urlEncode("Hello/World & Co.?"));
         assertEquals("M%C3%BCnchen+1+Ma%C3%9F+10+%E2%82%AC", WebbUtils.urlEncode("München 1 Maß 10 €"));
-    }
-
-    public void testToJsonObject() throws Exception {
-        JSONObject jsonExpected = new JSONObject();
-        jsonExpected.put("int", 1);
-        jsonExpected.put("bool", true);
-        jsonExpected.put("str", "a string");
-        String jsonStr = jsonExpected.toString();
-
-        JSONObject json = WebbUtils.toJsonObject(jsonStr.getBytes("UTF-8"));
-
-        assertEquals(jsonExpected.toString(), json.toString());
-    }
-
-    public void testToJsonObjectFail() throws Exception {
-        try {
-            // JSONObject parser is very forgiving: without ',' it would get parsed - unbelievable!
-            JSONObject json = WebbUtils.toJsonObject("{in, valid: 'json object'}".getBytes("UTF-8"));
-            // System.out.println(json.toString());
-        } catch (WebbException expected) {
-            return;
-        }
-        fail();
-    }
-
-    public void testToJsonArray() throws Exception {
-        JSONArray jsonExpected = new JSONArray();
-        jsonExpected.put(1);
-        jsonExpected.put(true);
-        jsonExpected.put("a string");
-        String jsonStr = jsonExpected.toString();
-
-        JSONArray json = WebbUtils.toJsonArray(jsonStr.getBytes("UTF-8"));
-
-        assertEquals(jsonExpected.toString(), json.toString());
-    }
-
-    public void testToJsonArrayFail() throws Exception {
-        try {
-            JSONArray array = WebbUtils.toJsonArray("[in - valid, 'json! array]".getBytes("UTF-8"));
-            // System.out.println(array.toString());
-        } catch (WebbException expected) {
-            return;
-        }
-        fail();
     }
 
     public void testReadBytes() throws Exception {
@@ -158,8 +105,10 @@ public class TestWebbUtils_NoMock extends TestCase {
         cal.set(Calendar.MILLISECOND, 501);
         Date date = cal.getTime();
 
-        DateFormat dateFormat = WebbUtils.getRfc1123DateFormat();
-        String formatted = dateFormat.format(date);
+        String formatted;
+        synchronized (WebbUtils.RFC1123_DATE_FORMAT) {
+            formatted = WebbUtils.RFC1123_DATE_FORMAT.format(date);
+        }
 
         if (!formatted.matches("^Tue, 24 Dec 2013 23:59:30 UTC(\\+0+:?0{0,2})?$")) {
             fail();
@@ -184,17 +133,17 @@ public class TestWebbUtils_NoMock extends TestCase {
         assertNotNull(gzip);
         assertTrue(payload.length > gzip.length);
 
-        assertArrayEquals(payload, gunzip(gzip));
+        assertArrayEquals(payload, gUnzip(gzip));
     }
 
-    public static byte[] gunzip(byte[] gzip) throws Exception {
-        ByteArrayInputStream bais = new ByteArrayInputStream(gzip);
-        GZIPInputStream gzipInputStream = new GZIPInputStream(bais);
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        WebbUtils.copyStream(gzipInputStream, baos);
+    static byte[] gUnzip(byte[] gzip) throws Exception {
+        ByteArrayInputStream baIs = new ByteArrayInputStream(gzip);
+        GZIPInputStream gzipInputStream = new GZIPInputStream(baIs);
+        ByteArrayOutputStream baOs = new ByteArrayOutputStream();
+        WebbUtils.copyStream(gzipInputStream, baOs);
         gzipInputStream.close();
-        baos.close();
-        return baos.toByteArray();
+        baOs.close();
+        return baOs.toByteArray();
     }
 
     private void assertArrayEquals(byte[] expected, byte[] bytes) {

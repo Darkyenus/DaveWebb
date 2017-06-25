@@ -5,8 +5,7 @@ import java.net.SocketTimeoutException;
 public class TestWebb_Timeouts extends AbstractTestWebb {
 
     public void testConnectTimeoutRequest() throws Exception {
-        // throw away artifact under test and create new
-        webb = Webb.create();
+        final Webb webb = new Webb(null);
         try {
             webb.get("http://www.goebl.com/robots.txt").connectTimeout(11).execute();
         } catch (WebbException e) {
@@ -15,37 +14,31 @@ public class TestWebb_Timeouts extends AbstractTestWebb {
     }
 
     public void testConnectTimeoutGlobal() throws Exception {
-        // throw away artifact under test and create new
-        Webb.setConnectTimeout(11);
-        webb = Webb.create();
+        final Webb webb = new Webb(null);
+        webb.setConnectTimeout(11);
         try {
             webb.get("http://www.goebl.com/robots.txt").execute();
         } catch (WebbException e) {
             assertEquals(SocketTimeoutException.class, e.getCause().getClass());
-        } finally {
-            Webb.setConnectTimeout(10000);
         }
     }
 
     public void testConnectTimeoutRequestOverrulesGlobal() throws Exception {
-        // throw away artifact under test and create new
-        Webb.setConnectTimeout(11);
-        webb = Webb.create();
+        final Webb webb = new Webb(null);
+        webb.setConnectTimeout(11);
         try {
             webb.get("http://www.goebl.com/robots.txt").connectTimeout(10000).execute();
         } catch (WebbException e) {
             fail("no exception expected (only if server is down), but is: " + e);
-        } finally {
-            Webb.setConnectTimeout(10000);
         }
     }
 
     public void testReadTimeoutRequest() throws Exception {
         // the REST api delivers after 500 millis
-        webb.get("/read-timeout").readTimeout(800).ensureSuccess().asString();
+        webb.get("/read-timeout").readTimeout(800).ensureSuccess().executeString();
 
         try {
-            webb.get("/read-timeout").readTimeout(100).asString();
+            webb.get("/read-timeout").readTimeout(100).executeString();
         } catch (WebbException e) {
             assertEquals(SocketTimeoutException.class, e.getCause().getClass());
         }
@@ -53,27 +46,27 @@ public class TestWebb_Timeouts extends AbstractTestWebb {
 
     public void testReadTimeoutGlobal() throws Exception {
         // the REST api delivers after 500 millis
-        Webb.setReadTimeout(800);
-        webb.get("/read-timeout").ensureSuccess().asString();
+        webb.setReadTimeout(800);
+        webb.get("/read-timeout").ensureSuccess().executeString();
 
         try {
-            Webb.setReadTimeout(100);
-            webb.get("/read-timeout").asString();
+            webb.setReadTimeout(100);
+            webb.get("/read-timeout").executeString();
         } catch (WebbException e) {
             assertEquals(SocketTimeoutException.class, e.getCause().getClass());
         } finally {
-            Webb.setReadTimeout(180000);
+            webb.setReadTimeout(180000);
         }
     }
 
     public void testReadTimeoutRequestOverrulesGlobal() throws Exception {
-        Webb.setReadTimeout(11);
+        webb.setReadTimeout(11);
         try {
-            webb.get("/read-timeout").readTimeout(1000).asString();
+            webb.get("/read-timeout").readTimeout(1000).executeString();
         } catch (WebbException e) {
             fail("no exception expected (only if server is busy), but is: " + e);
         } finally {
-            Webb.setReadTimeout(180000);
+            webb.setReadTimeout(180000);
         }
     }
 

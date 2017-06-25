@@ -1,8 +1,6 @@
 package com.goebl.david;
 
-import org.json.JSONObject;
 
-import java.net.HttpURLConnection;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.HashMap;
@@ -19,16 +17,13 @@ public class TestWebb extends AbstractTestWebb {
         assertEquals(HttpMethod.GET, request.method);
         assertEquals(true, request.useCaches);
 
-        Response<String> response = request.asString();
+        Response<String> response = request.executeString();
 
         assertTrue(response.isSuccess());
         assertEquals("pong", response.getBody());
-        assertNull(response.getErrorBody());
 
-        HttpURLConnection connection = response.getConnection();
-        assertNotNull(connection);
-        assertEquals(connection.getResponseMessage(), response.getStatusMessage());
-        assertEquals(connection.getResponseCode(), response.getStatusCode());
+        assertNotNull(response.getStatusMessage());
+        assertNotNull(response.getStatusCode());
 
         assertSame(request, response.getRequest());
     }
@@ -42,7 +37,7 @@ public class TestWebb extends AbstractTestWebb {
                 .get("/simple.txt")
                 .param("p1", SIMPLE_ASCII)
                 .param("p2", COMPLEX_UTF8)
-                .asString();
+                .executeString();
 
         assertEquals(200, response.getStatusCode());
         assertTrue(response.isSuccess());
@@ -58,7 +53,7 @@ public class TestWebb extends AbstractTestWebb {
                 .post("/simple.txt")
                 .param("p1", SIMPLE_ASCII)
                 .param("p2", COMPLEX_UTF8)
-                .asString();
+                .executeString();
 
         assertEquals(200, response.getStatusCode());
         assertEquals(HTTP_MESSAGE_OK, response.getStatusMessage());
@@ -71,63 +66,12 @@ public class TestWebb extends AbstractTestWebb {
         Response<String> response = webb
                 .post("/echoText")
                 .body(expected)
-                .asString();
+                .executeString();
 
         assertEquals(200, response.getStatusCode());
         assertEquals(HTTP_MESSAGE_OK, response.getStatusMessage());
         assertEquals(expected, response.getBody());
         assertTrue(response.getContentType().startsWith(WebbConst.MIME_TEXT_PLAIN));
-    }
-
-    public void testSimpleGetJson() throws Exception {
-        Response<JSONObject> response = webb
-                .get("/simple.json")
-                .param("p1", SIMPLE_ASCII)
-                .param("p2", COMPLEX_UTF8)
-                .useCaches(false)
-                .asJsonObject();
-
-        assertEquals(200, response.getStatusCode());
-        assertEquals(HTTP_MESSAGE_OK, response.getStatusMessage());
-        assertTrue(response.getContentType().startsWith(WebbConst.MIME_JSON));
-        JSONObject result = response.getBody();
-        assertNotNull(result);
-        assertEquals(SIMPLE_ASCII, result.getString("p1"));
-        assertEquals(COMPLEX_UTF8, result.getString("p2"));
-    }
-
-    public void testSimplePutJson() throws Exception {
-        JSONObject payload = new JSONObject();
-        payload.put("p1", SIMPLE_ASCII);
-        payload.put("p2", COMPLEX_UTF8);
-
-        Response<JSONObject> response = webb
-                .put("/simple.json")
-                .body(payload)
-                .asJsonObject();
-
-        assertEquals(200, response.getStatusCode());
-        assertTrue(response.getContentType().startsWith(WebbConst.MIME_JSON));
-        JSONObject result = response.getBody();
-        assertNotNull(result);
-        assertEquals(SIMPLE_ASCII, result.getString("p1"));
-        assertEquals(COMPLEX_UTF8, result.getString("p2"));
-    }
-
-    public void testSimplePostJson() throws Exception {
-        JSONObject payload = new JSONObject();
-        payload.put("p1", SIMPLE_ASCII);
-        payload.put("p2", COMPLEX_UTF8);
-
-        Response<Void> response = webb
-                .post("/simple.json")
-                .body(payload)
-                .execute();
-
-        assertEquals(201, response.getStatusCode());
-        assertTrue(response.isSuccess());
-        assertEquals("Created", response.getStatusMessage());
-        assertEquals("http://example.com/4711", response.getHeaderField("Location"));
     }
 
     public void testSimpleDelete() throws Exception {
@@ -153,7 +97,7 @@ public class TestWebb extends AbstractTestWebb {
 
         Response<String> responseAsString = webb
                 .get("/no-content")
-                .asString();
+                .executeString();
 
         assertEquals(204, responseAsString.getStatusCode());
         assertTrue(responseAsString.isSuccess());
@@ -169,7 +113,7 @@ public class TestWebb extends AbstractTestWebb {
                 .param("number", 4711) // test overwrite feature of multiple calls with same name
                 .param("null", null)
                 .param("empty", "")
-                .asString();
+                .executeString();
 
         assertEquals(204, response.getStatusCode());
     }
@@ -183,7 +127,7 @@ public class TestWebb extends AbstractTestWebb {
         Response<String> response = webb
                 .get("/parameter-types")
                 .params(params)
-                .asString();
+                .executeString();
 
         assertEquals(204, response.getStatusCode());
     }
@@ -193,7 +137,7 @@ public class TestWebb extends AbstractTestWebb {
         Response<String> response = webb
                 .get("/multiple-valued-parameter")
                 .param("m", values)
-                .asString();
+                .executeString();
 
         assertEquals(204, response.getStatusCode());
     }
@@ -203,7 +147,7 @@ public class TestWebb extends AbstractTestWebb {
         Response<String> response = webb
                 .get("/multiple-valued-parameter")
                 .param("m", values)
-                .asString();
+                .executeString();
 
         assertEquals(204, response.getStatusCode());
     }
@@ -216,7 +160,7 @@ public class TestWebb extends AbstractTestWebb {
                 .param("m", 1)
                 .param("m", true)
                 .param("m", "abc@abc.com")
-                .asString();
+                .executeString();
 
         assertEquals(204, response.getStatusCode());
     }
@@ -231,7 +175,7 @@ public class TestWebb extends AbstractTestWebb {
                 .header("x-test-int", 4711)
                 .header("x-test-calendar", cal)
                 .header("x-test-date", cal.getTime())
-                .param(WebbConst.HDR_USER_AGENT, WebbConst.DEFAULT_USER_AGENT)
+                .param(WebbConst.HDR_USER_AGENT, USER_AGENT)
                 .execute();
 
         assertEquals(200, response.getStatusCode());
@@ -314,15 +258,13 @@ public class TestWebb extends AbstractTestWebb {
     }
 
     public void testEnsureSuccess() throws Exception {
-        String result = webb.get("/ping").ensureSuccess().asString().getBody();
+        String result = webb.get("/ping").ensureSuccess().executeString().getBody();
         assertEquals("pong", result);
     }
 
     // should be moved to TestRequest
     public void testGetUri() throws Exception {
-
-        webb.setBaseUri("http://example.com");
-        Request request = webb.get("/simple.txt");
+        final Request request = new Webb("http://example.com").get("/simple.txt");
 
         assertEquals("http://example.com/simple.txt", request.getUri());
     }

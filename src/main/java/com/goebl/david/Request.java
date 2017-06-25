@@ -204,8 +204,13 @@ public final class Request {
         }
     }
 
+    /** Convenience method, calls {@link #body(File, String)} with type null. */
+    public Request body(final File file) {
+        return body(file, null);
+    }
+
     /** Set the payload for this request to the content of given file. Call only once. File will be streamed. */
-    public Request body(final File file, final String contentType) throws FileNotFoundException {
+    public Request body(final File file, final String contentType) {
         ensureBodyCanBeSet();
         if (file == null) throw new NullPointerException("file");
 
@@ -226,10 +231,19 @@ public final class Request {
         return this;
     }
 
-    /** Set the payload for this request to the content of given stream. Call only once. Data will be streamed. */
+    /** Set the payload for this request to the content of given stream. Call only once. Data will be streamed.
+     *
+     * Streaming is better and needed when the payload is too big and won't comfortably fit in memory.
+     * However, redirection is not supported in streamed mode. Trying to set streamed body and redirection
+     * in the same request will throw an IllegalStateException. */
     public Request body(BodyStreamProvider stream, String contentType) {
         ensureBodyCanBeSet();
         if (stream == null) throw new NullPointerException("stream");
+
+        if (this.followRedirects == Boolean.TRUE) {
+            throw new IllegalStateException("Can't follow redirects in streamed mode!");
+        }
+        this.followRedirects = Boolean.FALSE;
 
         this.payloadContentType = contentType;
         this.payloadStream = stream;
@@ -244,6 +258,11 @@ public final class Request {
         this.payloadContentType = contentType;
         this.payloadData = data;
         return this;
+    }
+
+    /** Convenience method, calls {@link #body(String, String)} with type null. */
+    public Request body(String data) {
+        return this.body(data, null);
     }
 
     /** Set the payload for this request to the given UTF8 bytes. Call only once.
@@ -339,12 +358,17 @@ public final class Request {
      * <br>
      * Use this method to set the behaviour for this single request when receiving redirect responses.
      * If you want to change the behaviour for all your requests, use {@link Webb#setFollowRedirects(boolean)}.
-     * @param auto <code>true</code> to automatically follow redirects (HTTP status code 3xx).
+     *
+     * @see #body(BodyStreamProvider, String) for caveat about streaming
+     * @param follow <code>true</code> to automatically follow redirects (HTTP status code 3xx).
      *             Default value comes from HttpURLConnection and should be <code>true</code>.
      * @return <code>this</code> for method chaining (fluent API)
      */
-    public Request followRedirects(boolean auto) {
-        this.followRedirects = auto;
+    public Request followRedirects(boolean follow) {
+        if (follow && payloadStream != null) {
+            throw new IllegalStateException("Can't enable following redirects when payload is streamed!");
+        }
+        this.followRedirects = follow;
         return this;
     }
 
@@ -402,24 +426,26 @@ public final class Request {
     }
 
     /**
+     * Execute the request with default string translator.
+     * @return the created <code>Response</code> object carrying the payload from the server as <code>String</code>
+     */
+    public Response<String> executeString() {
+        return webb.execute(this, ResponseTranslator.STRING_TRANSLATOR);
+    }
+
+    /**
+     * Execute the request with default byte[] translator.
+     * @return the created <code>Response</code> object carrying the payload from the server as <code>byte[]</code>
+     */
+    public Response<byte[]> executeBytes() {
+        return webb.execute(this, ResponseTranslator.BYTES_TRANSLATOR);
+    }
+
+    /**
      * Execute the request and expect no result payload (only status-code and headers).
      * @return the created <code>Response</code> object where no payload is expected or simply will be ignored.
      */
     public Response<Void> execute() {
         return webb.execute(this, null);
     }
-
-    public interface BodyStreamProvider <Stream extends InputStream> {
-        /** Called when stream is needed to write to the server. May be called again
-         * after {@link #destroyStream(InputStream)}, if the request failed and must be performed again. */
-        Stream createStream() throws Exception;
-
-        /** Called with stream returned by createStream to get the size of stream. This amount (in bytes) must be correct.
-         * If it is not possible to tell, return -1. */
-        long payloadSize(Stream forStream);
-
-        /** Called always after createStream with previously returned stream. Close the stream here, if needed. */
-        void destroyStream(Stream usedStream);
-    }
-
 }

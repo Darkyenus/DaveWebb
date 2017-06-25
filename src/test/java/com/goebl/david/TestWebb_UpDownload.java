@@ -5,7 +5,8 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.util.Random;
-import org.json.JSONArray;
+
+import com.esotericsoftware.jsonbeans.JsonValue;
 
 public class TestWebb_UpDownload extends AbstractTestWebb {
     private static File TEST_FILE;
@@ -62,14 +63,24 @@ public class TestWebb_UpDownload extends AbstractTestWebb {
         createTestFile();
         testFileCreated = true;
 
-        InputStream inputStream = new FileInputStream(TEST_FILE);
 
         Response<Void> response = webb
                 .post("/upload?stream")
-                .body(inputStream)
-                .execute();
+                .body(new BodyStreamProvider<FileInputStream>() {
 
-        inputStream.close();
+                    public FileInputStream createStream() throws Exception {
+                        return new FileInputStream(TEST_FILE);
+                    }
+
+                    public long payloadSize(FileInputStream forStream) {
+                        return -1;
+                    }
+
+                    public void destroyStream(FileInputStream usedStream) {
+                        WebbUtils.closeQuietly(usedStream);
+                    }
+                }, null)
+                .execute();
 
         assertEquals(201, response.getStatusCode());
     }
@@ -95,8 +106,8 @@ public class TestWebb_UpDownload extends AbstractTestWebb {
                 .post("/echoBin") //force-content-encoding
                 .header(WebbConst.HDR_ACCEPT_ENCODING, "gzip")
                 .compress()
-                .body(payload)
-                .asBytes();
+                .body(payload, null)
+                .executeBytes();
 
         assertEquals(200, response.getStatusCode());
         byte[] echoed = response.getBody();
@@ -112,8 +123,8 @@ public class TestWebb_UpDownload extends AbstractTestWebb {
         Response<byte[]> response = webb
                 .post("/echoBin?force-content-encoding=identity")
                 .compress()
-                .body(payload)
-                .asBytes();
+                .body(payload, null)
+                .executeBytes();
 
         assertEquals(200, response.getStatusCode());
         byte[] echoed = response.getBody();
@@ -130,38 +141,38 @@ public class TestWebb_UpDownload extends AbstractTestWebb {
         Response<byte[]> response = webb
                 .post("/echoBin?force-content-encoding=identity")
                 .compress()
-                .body(payload)
-                .asBytes();
+                .body(payload, null)
+                .executeBytes();
 
         assertEquals(200, response.getStatusCode());
         byte[] echoed = response.getBody();
         assertNotNull(echoed);
         assertTrue(payload.length > echoed.length);
 
-        byte[] gunzip = TestWebbUtils_NoMock.gunzip(echoed);
+        byte[] gunzip = TestWebbUtils_NoMock.gUnzip(echoed);
         assertArrayEquals(payload, gunzip);
     }
 
     public void testDownloadGzip() throws Exception {
 
-        Response<JSONArray> response = webb
+        Response<JsonValue> response = webb
                 .get("/compressed.json")
                 .header(WebbConst.HDR_ACCEPT_ENCODING, "gzip")
-                .asJsonArray();
+                .execute(JSON_TRANSLATOR);
 
         assertEquals(200, response.getStatusCode());
-        assertEquals(500, response.getBody().length());
+        assertEquals(500, response.getBody().size);
     }
 
     public void testDownloadDeflate() throws Exception {
 
-        Response<JSONArray> response = webb
+        Response<JsonValue> response = webb
                 .get("/compressed.json")
                 .header(WebbConst.HDR_ACCEPT_ENCODING, "deflate")
-                .asJsonArray();
+                .execute(JSON_TRANSLATOR);
 
         assertEquals(200, response.getStatusCode());
-        assertEquals(500, response.getBody().length());
+        assertEquals(500, response.getBody().size);
     }
 
     public void testDownloadUnknownEncoding() throws Exception {
@@ -170,7 +181,8 @@ public class TestWebb_UpDownload extends AbstractTestWebb {
                 .header(WebbConst.HDR_ACCEPT_ENCODING, "unknown");
 
         try {
-            Response<byte[]> response = request.asBytes();
+            //noinspection unused
+            Response<byte[]> response = request.executeBytes();
         } catch (WebbException expected) {
             assertTrue(expected.getMessage().matches("^unsupported.*encoding.*$"));
             return;
@@ -182,24 +194,26 @@ public class TestWebb_UpDownload extends AbstractTestWebb {
         byte[] msg = (SIMPLE_ASCII + ", " + COMPLEX_UTF8).getBytes(WebbConst.UTF8);
         Response<byte[]> response = webb
                 .post("/echoBin")
-                .body(msg)
-                .asBytes();
+                .body(msg, null)
+                .executeBytes();
 
         assertArrayEquals(msg, response.getBody());
     }
 
     public void testEchoAsStream() throws Exception {
         byte[] msg = (SIMPLE_ASCII + ", " + COMPLEX_UTF8).getBytes(WebbConst.UTF8);
-        Response<InputStream> response = webb
+        Response<byte[]> response = webb
                 .post("/echoBin")
-                .body(msg)
-                .asStream();
-        InputStream is = response.getBody();
-        try {
-            byte[] result = WebbUtils.readBytes(is);
-            assertArrayEquals(msg, result);
-        } finally {
-            is.close();
-        }
+                .body(msg, null)
+                .execute(new ResponseTranslator<byte[]>() {
+                    public byte[] decode(Response response, InputStream in) throws Exception {
+                        return WebbUtils.readBytes(in);
+                    }
+
+                    public byte[] decodeEmptyBody(Response response) throws Exception {
+                        return null;
+                    }
+                });
+        assertArrayEquals(msg, response.body);
     }
 }

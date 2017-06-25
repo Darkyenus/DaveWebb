@@ -250,7 +250,7 @@ public final class Webb {
             WebbUtils.addRequestProperties(connection, mergeHeaders(request.headers));
 
             if (request.method.canHaveBody) {
-                final Request.BodyStreamProvider payloadStream = request.payloadStream;
+                final BodyStreamProvider payloadStream = request.payloadStream;
                 final byte[] payloadData = request.payloadData;
 
                 if (payloadStream != null) {
@@ -258,24 +258,34 @@ public final class Webb {
 
                     InputStream stream = payloadStream.createStream();
 
-                    long length = -1;
-
-                    if (!request.compressPayload) {
-                        //noinspection unchecked
-                        length = payloadStream.payloadSize(stream);
-                    }
-
-                    if (length > Integer.MAX_VALUE) {
-                        length = -1L; // use chunked streaming mode
-                    }
-
-                    if (length < 0) {
+                    if (request.compressPayload) {
                         connection.setChunkedStreamingMode(-1); // use default chunk size
-                        if (request.compressPayload) {
-                            connection.setRequestProperty(WebbConst.HDR_CONTENT_ENCODING, "gzip");
-                        }
+                        connection.setRequestProperty(WebbConst.HDR_CONTENT_ENCODING, "gzip");
                     } else {
-                        connection.setFixedLengthStreamingMode((int) length);
+                        //noinspection unchecked
+                        final long length = payloadStream.payloadSize(stream);
+                        boolean lengthSet = false;
+
+                        // - 8 just in case, values too close to close to MAX_VALUE may be buggy
+                        if (length > 0 && length <= Integer.MAX_VALUE - 8) {
+                            // This is fine, we can set this always
+                            connection.setFixedLengthStreamingMode((int)length);
+                            lengthSet = true;
+                        } else if (length > 0) {
+                            // This should be fine on newer implementations...
+                            try {
+                                //noinspection Since15
+                                connection.setFixedLengthStreamingMode(length);
+                                lengthSet = true;
+                            } catch (NoSuchMethodError ignored) {
+                                // ... and this is not a new implementation
+                            }
+                        }
+
+                        if (!lengthSet) {
+                            // Length can't be set normally, send it in parts
+                            connection.setChunkedStreamingMode(-1); // use default chunk size
+                        }
                     }
 
                     connection.setDoOutput(true);
@@ -305,12 +315,12 @@ public final class Webb {
                     }
                 } else if (payloadData != null || request.params != null) {
                     byte[] sentPayloadData;
-                    if (payloadData != null) {
-                        sentPayloadData = payloadData;
-                        WebbUtils.ensureRequestProperty(connection, WebbConst.HDR_CONTENT_TYPE, request.payloadContentType != null ? request.payloadContentType : WebbConst.MIME_BINARY);
-                    } else {
+                    if (payloadData == null) {
                         sentPayloadData = WebbUtils.queryString(request.params).getBytes(WebbConst.UTF8);
                         WebbUtils.ensureRequestProperty(connection, WebbConst.HDR_CONTENT_TYPE, WebbConst.MIME_URLENCODED);
+                    } else {
+                        sentPayloadData = payloadData;
+                        WebbUtils.ensureRequestProperty(connection, WebbConst.HDR_CONTENT_TYPE, request.payloadContentType != null ? request.payloadContentType : WebbConst.MIME_BINARY);
                     }
 
 
@@ -323,7 +333,8 @@ public final class Webb {
                         }
                     }
 
-                    connection.setFixedLengthStreamingMode(sentPayloadData.length);
+                    // We don't need to setFixedLengthStreamingMode, because we already know that given data will fit
+                    // into internal buffers - we already have it in memory!
                     connection.setDoOutput(true);
                     writeBody(connection, sentPayloadData);
                 }
@@ -345,9 +356,10 @@ public final class Webb {
 
             if (translator == null) {
                 response.body = null;
-            } else {
-                //noinspection unchecked
+            } else if (is != null) {
                 response.body = translator.decode(response, is);
+            } else {
+                response.body = translator.decodeEmptyBody(response);
             }
 
             return response;

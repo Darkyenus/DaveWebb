@@ -7,8 +7,6 @@ public final class WebbConst {
     private WebbConst() {
     }
 
-    public static final String DEFAULT_USER_AGENT = "com.goebl.david.Webb/1.0";
-
     // MIME types
     public static final String MIME_URLENCODED = "application/x-www-form-urlencoded";
     public static final String MIME_JSON = "application/json";

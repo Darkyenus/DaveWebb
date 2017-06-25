@@ -2,8 +2,12 @@ package com.goebl.david;
 
 import java.io.IOException;
 import java.net.HttpURLConnection;
+import java.text.ParseException;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
+
+import static com.goebl.david.WebbUtils.RFC1123_DATE_FORMAT;
 
 /**
  * Holds data about the response message returning from HTTP request.
@@ -165,6 +169,31 @@ public final class Response<T> {
         try {
             return Long.parseLong(value);
         } catch (NumberFormatException ex) {
+            return defaultValue;
+        }
+    }
+
+    /**
+     * Returns the value of the named field parsed as a date (ms since epoch).
+     *
+     * @param name of the header field
+     * @param defaultValue the default value if the field is not present or malformed
+     * @return the value of the named header field, or the given default value
+     * @see #getHeaderField(String) for header field resolution
+     */
+    public long getHeaderFieldDate(String name, long defaultValue) {
+        final String value = getHeaderField(name);
+        if (value == null) return defaultValue;
+        try {
+            final Date date;
+            synchronized (RFC1123_DATE_FORMAT) {
+                date = RFC1123_DATE_FORMAT.parse(value);
+            }
+            if (date == null) {
+                return defaultValue;
+            }
+            return date.getTime();
+        } catch (ParseException ex) {
             return defaultValue;
         }
     }

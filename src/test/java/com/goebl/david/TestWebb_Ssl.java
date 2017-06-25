@@ -1,6 +1,6 @@
 package com.goebl.david;
 
-import org.json.JSONObject;
+import com.esotericsoftware.jsonbeans.JsonValue;
 
 import javax.net.ssl.HostnameVerifier;
 import javax.net.ssl.SSLContext;
@@ -13,22 +13,23 @@ import java.security.cert.X509Certificate;
 
 public class TestWebb_Ssl extends AbstractTestWebb {
 
-    public void testHttpsValidCertificate() throws Exception {
-        webb.setBaseUri(null);
+    @Override
+    String uri() {
+        return null;
+    }
 
-        Response<JSONObject> response = webb
+    public void testHttpsValidCertificate() throws Exception {
+        Response<JsonValue> response = webb
                 .get("https://www.googleapis.com/oauth2/v1/certs")
                 .ensureSuccess()
-                .asJsonObject();
+                .execute(JSON_TRANSLATOR);
 
         assertEquals(200, response.getStatusCode());
     }
 
     public void testHttpsInvalidCertificate() throws Exception {
-        webb.setBaseUri(null);
-
         try {
-            webb.get("https://tv.eurosport.com/").ensureSuccess().asString();
+            webb.get("https://tv.eurosport.com/").ensureSuccess().executeString();
             fail();
         } catch (WebbException e) {
             Class expected = isAndroid() ? IOException.class : SSLHandshakeException.class;
@@ -38,7 +39,6 @@ public class TestWebb_Ssl extends AbstractTestWebb {
 
     // @Ignore // TODO since upgrade to Debian 7 this test fails -> fix it!
     public void ignoreHttpsHostnameIgnore() throws Exception {
-        webb.setBaseUri(null);
         webb.setHostnameVerifier(new TrustingHostnameVerifier());
 
         // www.wellcrafted.de has same IP as www.goebl.com, but certificate is for www.goebl.com
@@ -47,8 +47,6 @@ public class TestWebb_Ssl extends AbstractTestWebb {
     }
 
     public void testHttpsInvalidCertificateAndHostnameIgnore() throws Exception {
-        webb.setBaseUri(null);
-
         TrustManager[] trustAllCerts = new TrustManager[] { new AlwaysTrustManager() };
         SSLContext sslContext = SSLContext.getInstance("TLS");
         sslContext.init(null, trustAllCerts, new java.security.SecureRandom());

@@ -3,13 +3,8 @@ package com.goebl.david;
 import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URLEncoder;
-import java.text.DateFormat;
 import java.text.SimpleDateFormat;
-import java.util.Calendar;
-import java.util.Date;
-import java.util.Locale;
-import java.util.Map;
-import java.util.TimeZone;
+import java.util.*;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 import java.util.zip.Inflater;
@@ -100,20 +95,17 @@ final class WebbUtils {
     }
 
     /**
-     * Creates a new instance of a <code>DateFormat</code> for RFC1123 compliant dates.
+     * Instance of a <code>DateFormat</code> for RFC1123 compliant dates.
      * <br>
-     * Should be stored for later use but be aware that this DateFormat is not Thread-safe!
+     * This DateFormat is not thread-safe, so synchronize on it when using!
      * <br>
      * If you have to deal with dates in this format with JavaScript, it's easy, because the JavaScript
      * Date object has a constructor for strings formatted this way.
-     * @return a new instance
      */
-    static DateFormat getRfc1123DateFormat() {
-        DateFormat format = new SimpleDateFormat(
-                "EEE, dd MMM yyyy HH:mm:ss z", Locale.ENGLISH);
-        format.setLenient(false);
-        format.setTimeZone(TimeZone.getTimeZone("UTC"));
-        return format;
+    static final SimpleDateFormat RFC1123_DATE_FORMAT = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz", Locale.ENGLISH);
+    static {
+        RFC1123_DATE_FORMAT.setLenient(false);
+        RFC1123_DATE_FORMAT.setTimeZone(TimeZone.getTimeZone("UTC"));
     }
 
     static String urlEncode(String value) {
@@ -140,9 +132,13 @@ final class WebbUtils {
 
         String valueAsString;
         if (value instanceof Date) {
-            valueAsString = getRfc1123DateFormat().format((Date) value);
+            synchronized (RFC1123_DATE_FORMAT) {
+                valueAsString = RFC1123_DATE_FORMAT.format((Date) value);
+            }
         } else if (value instanceof Calendar) {
-            valueAsString = getRfc1123DateFormat().format(((Calendar) value).getTime());
+            synchronized (RFC1123_DATE_FORMAT) {
+                valueAsString = RFC1123_DATE_FORMAT.format(((Calendar) value).getTime());
+            }
         } else {
             valueAsString = value.toString();
         }

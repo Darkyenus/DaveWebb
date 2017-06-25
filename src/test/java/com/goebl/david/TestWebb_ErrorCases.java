@@ -1,6 +1,6 @@
 package com.goebl.david;
 
-import org.json.JSONObject;
+import com.esotericsoftware.jsonbeans.JsonValue;
 
 public class TestWebb_ErrorCases extends AbstractTestWebb {
 
@@ -34,74 +34,70 @@ public class TestWebb_ErrorCases extends AbstractTestWebb {
     public void testError404NoContent() throws Exception {
         Response<String> response = webb
                 .get("/error/404")
-                .asString();
+                .executeString();
 
         assertFalse(response.isSuccess());
         assertEquals(404, response.getStatusCode());
         assertEquals("Not Found", response.getStatusMessage());
-        assertNull(response.getBody());
-        assertEquals(String.class, response.getErrorBody().getClass());
+        assertEquals(String.class, response.getBody().getClass());
     }
 
     public void testError400NoContent() throws Exception {
         Response<String> response = webb
                 .get("/error/400/no-content")
-                .asString();
+                .executeString();
 
         assertFalse(response.isSuccess());
         assertEquals(400, response.getStatusCode());
-        assertNull(response.getBody());
-        assertEquals("Bad Request", response.getErrorBody());
+        assertEquals("Bad Request", response.getBody());
     }
 
     public void testError400WithContent() throws Exception {
-        Response<JSONObject> response = webb
+        Response<JsonValue> response = webb
                 .get("/error/400/with-content")
-                .asJsonObject();
+                .execute(JSON_TRANSLATOR);
 
         assertFalse(response.isSuccess());
         assertEquals(400, response.getStatusCode());
-        assertNull(response.getBody());
-        assertNotNull(response.getErrorBody());
-        assertEquals(JSONObject.class, response.getErrorBody().getClass());
-        JSONObject errorObject = (JSONObject) response.getErrorBody();
-        assertNotNull(errorObject.optString("msg"));
+        assertNotNull(response.getBody());
+        assertEquals(JsonValue.class, response.getBody().getClass());
+        assertNotNull(response.getBody().getString("msg", null));
     }
 
     public void testPostError500WithContent_JSON() throws Exception {
-        Response<JSONObject> response = webb
+        Response<JsonValue> response = webb
                 .post("/error/500/with-content")
                 .body("This is some content")
-                .asJsonObject();
+                .execute(JSON_TRANSLATOR);
 
         assertFalse(response.isSuccess());
         assertEquals(500, response.getStatusCode());
-        assertNull(response.getBody());
-        assertEquals(JSONObject.class, response.getErrorBody().getClass());
-        JSONObject errorObject = (JSONObject) response.getErrorBody();
-        assertEquals("an error has occurred", errorObject.optString("msg"));
+        assertNotNull(response.getBody());
+        assertEquals(JsonValue.class, response.getBody().getClass());
+        assertEquals("an error has occurred", response.getBody().getString("msg", null));
     }
 
     public void testPostError500WithContent_String() throws Exception {
         Response<String> response = webb
                 .post("/error/500/with-content")
                 .body("This is some content")
-                .asString();
+                .executeString();
 
         assertFalse(response.isSuccess());
         assertEquals(500, response.getStatusCode());
-        assertNull(response.getBody());
-        assertEquals(String.class, response.getErrorBody().getClass());
-        String error = (String) response.getErrorBody();
+        assertNotNull(response.getBody());
+        assertEquals(String.class, response.getBody().getClass());
+        String error = response.getBody();
         assertTrue(error.contains("an error has occurred"));
     }
 
     public void testEnsureSuccessFailedWithContent() throws Exception {
         try {
-            JSONObject result = webb
+            //noinspection unused
+            JsonValue result = webb
                     .get("/error/500/with-content")
                     .ensureSuccess()
-                    .asJsonObject()
+                    .execute(JSON_TRANSLATOR)
                     .getBody();
             fail("should throw exception");
         } catch (WebbException expected) {
@@ -109,30 +105,31 @@ public class TestWebb_ErrorCases extends AbstractTestWebb {
             assertNotNull(response);
             assertFalse(response.isSuccess());
             assertEquals(500, response.getStatusCode());
-            assertNull(response.getBody());
-            assertNotNull(response.getErrorBody());
-            assertEquals(JSONObject.class, response.getErrorBody().getClass());
-            JSONObject errorObject = (JSONObject) response.getErrorBody();
-            assertEquals("an error has occurred", errorObject.optString("msg"));
+            assertNotNull(response.getBody());
+            assertEquals(JsonValue.class, response.getBody().getClass());
+            JsonValue errorObject = (JsonValue) response.getBody();
+            assertEquals("an error has occurred", errorObject.getString("msg"));
         }
     }
 
     public void testEnsureSuccessFailedNoContent() throws Exception {
         try {
-            JSONObject result = webb
+            //noinspection unused
+            String result = webb
                     .get("/error/500/no-content")
                     .ensureSuccess()
-                    .asJsonObject()
+                    .executeString()
                     .getBody();
             fail("should throw exception");
         } catch (WebbException expected) {
-            Response response = expected.getResponse();
+            Response<String> response = expected.getResponse();
             assertNotNull(response);
             assertFalse(response.isSuccess());
             assertEquals(500, response.getStatusCode());
-            assertNull(response.getBody());
-            assertNotNull(response.getErrorBody());
-            assertEquals("Internal Server Error", response.getErrorBody());
+
+            final String expectedString = "Internal Server Error";
+            final String gotString = response.getBody();
+            assertEquals(expectedString, gotString);
         }
     }
 

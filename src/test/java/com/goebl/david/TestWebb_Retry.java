@@ -8,7 +8,7 @@ public class TestWebb_Retry extends AbstractTestWebb {
                 .get("/error/503/" + System.currentTimeMillis() + "/2")
                 .retry(2, true)
                 .ensureSuccess()
-                .asString()
+                .executeString()
                 .getBody();
 
         assertEquals("Now it works", successAnswer);
@@ -20,13 +20,13 @@ public class TestWebb_Retry extends AbstractTestWebb {
         webb.get("/simple.txt")
                 .retry(3, false)
                 .ensureSuccess()
-                .asString()
+                .executeString()
                 .getBody();
         try {
             webb.get("/simple.txt")
                     .retry(4, false)
                     .ensureSuccess()
-                    .asString()
+                    .executeString()
                     .getBody();
             fail("expected IllegalArgumentException");
         } catch (IllegalArgumentException expected) {
