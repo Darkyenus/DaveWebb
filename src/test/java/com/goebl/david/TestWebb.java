@@ -16,7 +16,7 @@ public class TestWebb extends AbstractTestWebb {
                 .get("/ping")
                 .useCaches(true);
 
-        assertEquals(Request.Method.GET, request.method);
+        assertEquals(HttpMethod.GET, request.method);
         assertEquals(true, request.useCaches);
 
         Response<String> response = request.asString();
@@ -27,14 +27,14 @@ public class TestWebb extends AbstractTestWebb {
 
         HttpURLConnection connection = response.getConnection();
         assertNotNull(connection);
-        assertEquals(connection.getResponseMessage(), response.getResponseMessage());
+        assertEquals(connection.getResponseMessage(), response.getStatusMessage());
         assertEquals(connection.getResponseCode(), response.getStatusCode());
 
         assertSame(request, response.getRequest());
     }
 
     public void testIgnoreBaseUri() throws Exception {
-        webb.get("http://www.goebl.com/robots.txt").ensureSuccess().asVoid();
+        webb.get("http://www.goebl.com/robots.txt").ensureSuccess().execute();
     }
 
     public void testSimpleGetText() throws Exception {
@@ -46,11 +46,11 @@ public class TestWebb extends AbstractTestWebb {
 
         assertEquals(200, response.getStatusCode());
         assertTrue(response.isSuccess());
-        assertEquals(HTTP_MESSAGE_OK, response.getResponseMessage());
+        assertEquals(HTTP_MESSAGE_OK, response.getStatusMessage());
         assertEquals("HTTP/1.1 200 OK", response.getStatusLine());
 
         assertEquals(SIMPLE_ASCII + ", " + COMPLEX_UTF8, response.getBody());
-        assertEquals(Webb.TEXT_PLAIN, response.getContentType());
+        assertEquals(WebbConst.MIME_TEXT_PLAIN, response.getContentType());
     }
 
     public void testSimplePostText() throws Exception {
@@ -61,9 +61,9 @@ public class TestWebb extends AbstractTestWebb {
                 .asString();
 
         assertEquals(200, response.getStatusCode());
-        assertEquals(HTTP_MESSAGE_OK, response.getResponseMessage());
+        assertEquals(HTTP_MESSAGE_OK, response.getStatusMessage());
         assertEquals(SIMPLE_ASCII + ", " + COMPLEX_UTF8, response.getBody());
-        assertTrue(response.getContentType().startsWith(Webb.TEXT_PLAIN));
+        assertTrue(response.getContentType().startsWith(WebbConst.MIME_TEXT_PLAIN));
     }
 
     public void testEchoPostText() throws Exception {
@@ -74,9 +74,9 @@ public class TestWebb extends AbstractTestWebb {
                 .asString();
 
         assertEquals(200, response.getStatusCode());
-        assertEquals(HTTP_MESSAGE_OK, response.getResponseMessage());
+        assertEquals(HTTP_MESSAGE_OK, response.getStatusMessage());
         assertEquals(expected, response.getBody());
-        assertTrue(response.getContentType().startsWith(Webb.TEXT_PLAIN));
+        assertTrue(response.getContentType().startsWith(WebbConst.MIME_TEXT_PLAIN));
     }
 
     public void testSimpleGetJson() throws Exception {
@@ -88,8 +88,8 @@ public class TestWebb extends AbstractTestWebb {
                 .asJsonObject();
 
         assertEquals(200, response.getStatusCode());
-        assertEquals(HTTP_MESSAGE_OK, response.getResponseMessage());
-        assertTrue(response.getContentType().startsWith(Webb.APP_JSON));
+        assertEquals(HTTP_MESSAGE_OK, response.getStatusMessage());
+        assertTrue(response.getContentType().startsWith(WebbConst.MIME_JSON));
         JSONObject result = response.getBody();
         assertNotNull(result);
         assertEquals(SIMPLE_ASCII, result.getString("p1"));
@@ -107,7 +107,7 @@ public class TestWebb extends AbstractTestWebb {
                 .asJsonObject();
 
         assertEquals(200, response.getStatusCode());
-        assertTrue(response.getContentType().startsWith(Webb.APP_JSON));
+        assertTrue(response.getContentType().startsWith(WebbConst.MIME_JSON));
         JSONObject result = response.getBody();
         assertNotNull(result);
         assertEquals(SIMPLE_ASCII, result.getString("p1"));
@@ -122,11 +122,11 @@ public class TestWebb extends AbstractTestWebb {
         Response<Void> response = webb
                 .post("/simple.json")
                 .body(payload)
-                .asVoid();
+                .execute();
 
         assertEquals(201, response.getStatusCode());
         assertTrue(response.isSuccess());
-        assertEquals("Created", response.getResponseMessage());
+        assertEquals("Created", response.getStatusMessage());
         assertEquals("http://example.com/4711", response.getHeaderField("Location"));
     }
 
@@ -134,22 +134,22 @@ public class TestWebb extends AbstractTestWebb {
 
         Response<Void> response = webb
                 .delete("/simple")
-                .asVoid();
+                .execute();
 
         assertEquals(204, response.getStatusCode());
         assertTrue(response.isSuccess());
-        assertEquals("No Content", response.getResponseMessage());
+        assertEquals("No Content", response.getStatusMessage());
     }
 
     public void testNoContent() throws Exception {
 
         Response<Void> responseAsVoid = webb
                 .get("/no-content")
-                .asVoid();
+                .execute();
 
         assertEquals(204, responseAsVoid.getStatusCode());
         assertTrue(responseAsVoid.isSuccess());
-        assertEquals("No Content", responseAsVoid.getResponseMessage());
+        assertEquals("No Content", responseAsVoid.getStatusMessage());
 
         Response<String> responseAsString = webb
                 .get("/no-content")
@@ -157,7 +157,7 @@ public class TestWebb extends AbstractTestWebb {
 
         assertEquals(204, responseAsString.getStatusCode());
         assertTrue(responseAsString.isSuccess());
-        assertEquals("No Content", responseAsString.getResponseMessage());
+        assertEquals("No Content", responseAsString.getStatusMessage());
         assertEquals("", responseAsString.getBody());
     }
 
@@ -231,8 +231,8 @@ public class TestWebb extends AbstractTestWebb {
                 .header("x-test-int", 4711)
                 .header("x-test-calendar", cal)
                 .header("x-test-date", cal.getTime())
-                .param(Webb.HDR_USER_AGENT, Webb.DEFAULT_USER_AGENT)
-                .asVoid();
+                .param(WebbConst.HDR_USER_AGENT, WebbConst.DEFAULT_USER_AGENT)
+                .execute();
 
         assertEquals(200, response.getStatusCode());
     }
@@ -241,7 +241,7 @@ public class TestWebb extends AbstractTestWebb {
 
         Response<Void> response = webb
                 .get("/headers/out")
-                .asVoid();
+                .execute();
         long nowMoreOrLess = System.currentTimeMillis();
 
         assertEquals(200, response.getStatusCode());
@@ -262,7 +262,7 @@ public class TestWebb extends AbstractTestWebb {
         Response<Void> response = webb
                 .get("/headers/expires")
                 .param("offset", offset)
-                .asVoid();
+                .execute();
 
         assertEquals(200, response.getStatusCode());
         long expiresRaw = response.getHeaderFieldDate("Expires", 0L);
@@ -286,7 +286,7 @@ public class TestWebb extends AbstractTestWebb {
                 .get("/headers/if-modified-since")
                 .ifModifiedSince(lastModified - 100000)
                 .param("lastModified", lastModified)
-                .asVoid();
+                .execute();
 
         assertEquals(200, response.getStatusCode());
 
@@ -295,7 +295,7 @@ public class TestWebb extends AbstractTestWebb {
                 .get("/headers/if-modified-since")
                 .ifModifiedSince(lastModified + 5000)
                 .param("lastModified", lastModified)
-                .asVoid();
+                .execute();
 
         assertEquals(304, response.getStatusCode());
     }
@@ -307,7 +307,7 @@ public class TestWebb extends AbstractTestWebb {
         Response<Void> response = webb
                 .get("/headers/last-modified")
                 .param("lastModified", lastModified)
-                .asVoid();
+                .execute();
 
         assertEquals(200, response.getStatusCode());
         assertEquals(lastModified, response.getLastModified());

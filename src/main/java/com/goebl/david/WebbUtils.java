@@ -1,15 +1,6 @@
 package com.goebl.david;
 
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
-
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.io.UnsupportedEncodingException;
+import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URLEncoder;
 import java.text.DateFormat;
@@ -29,9 +20,9 @@ import java.util.zip.InflaterInputStream;
  *
  * @author hgoebl
  */
-public class WebbUtils {
+final class WebbUtils {
 
-    protected WebbUtils() {}
+    private WebbUtils() {}
 
     /**
      * Convert a Map to a query string.
@@ -40,7 +31,7 @@ public class WebbUtils {
      *               String by calling its <code>toString()</code> method.
      * @return e.g. "key1=value&amp;key2=&amp;email=max%40example.com"
      */
-    public static String queryString(Map<String, Object> values) {
+    static String queryString(Map<String, Object> values) {
         StringBuilder sbuf = new StringBuilder();
         String separator = "";
 
@@ -74,42 +65,6 @@ public class WebbUtils {
     }
 
     /**
-     * Convert a byte array to a JSONObject.
-     * @param bytes a UTF-8 encoded string representing a JSON object.
-     * @return the parsed object
-     * @throws WebbException in case of error (usually a parsing error due to invalid JSON)
-     */
-    public static JSONObject toJsonObject(byte[] bytes) {
-        String json;
-        try {
-            json = new String(bytes, Const.UTF8);
-            return new JSONObject(json);
-        } catch (UnsupportedEncodingException e) {
-            throw new WebbException(e);
-        } catch (JSONException e) {
-            throw new WebbException("payload is not a valid JSON object", e);
-        }
-    }
-
-    /**
-     * Convert a byte array to a JSONArray.
-     * @param bytes a UTF-8 encoded string representing a JSON array.
-     * @return the parsed JSON array
-     * @throws WebbException in case of error (usually a parsing error due to invalid JSON)
-     */
-    public static JSONArray toJsonArray(byte[] bytes) {
-        String json;
-        try {
-            json = new String(bytes, Const.UTF8);
-            return new JSONArray(json);
-        } catch (UnsupportedEncodingException e) {
-            throw new WebbException(e);
-        } catch (JSONException e) {
-            throw new WebbException("payload is not a valid JSON array", e);
-        }
-    }
-
-    /**
      * Read an <code>InputStream</code> into <code>byte[]</code> until EOF.
      * <br>
      * Does not close the InputStream!
@@ -118,13 +73,13 @@ public class WebbUtils {
      * @return all read bytes as an array
      * @throws IOException when read or write operation fails
      */
-    public static byte[] readBytes(InputStream is) throws IOException {
+    static byte[] readBytes(InputStream is) throws IOException {
         if (is == null) {
             return null;
         }
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        copyStream(is, baos);
-        return baos.toByteArray();
+        ByteArrayOutputStream byteOut = new ByteArrayOutputStream();
+        copyStream(is, byteOut);
+        return byteOut.toByteArray();
     }
 
     /**
@@ -136,7 +91,7 @@ public class WebbUtils {
      * @param output the stream to write the bytes to
      * @throws IOException when read or write operation fails
      */
-    public static void copyStream(InputStream input, OutputStream output) throws IOException {
+    static void copyStream(InputStream input, OutputStream output) throws IOException {
         byte[] buffer = new byte[1024];
         int count;
         while ((count = input.read(buffer)) != -1) {
@@ -153,7 +108,7 @@ public class WebbUtils {
      * Date object has a constructor for strings formatted this way.
      * @return a new instance
      */
-    public static DateFormat getRfc1123DateFormat() {
+    static DateFormat getRfc1123DateFormat() {
         DateFormat format = new SimpleDateFormat(
                 "EEE, dd MMM yyyy HH:mm:ss z", Locale.ENGLISH);
         format.setLenient(false);
@@ -163,7 +118,7 @@ public class WebbUtils {
 
     static String urlEncode(String value) {
         try {
-            return URLEncoder.encode(value, "UTF-8");
+            return URLEncoder.encode(value, WebbConst.UTF8);
         } catch (UnsupportedEncodingException e) {
             return value;
         }
@@ -201,96 +156,12 @@ public class WebbUtils {
         }
     }
 
-    static byte[] getPayloadAsBytesAndSetContentType(
-            HttpURLConnection connection,
-            Request request,
-            boolean compress,
-            int jsonIndentFactor) throws JSONException, UnsupportedEncodingException {
-
-        byte[] requestBody = null;
-        String bodyStr = null;
-
-        if (request.params != null) {
-            WebbUtils.ensureRequestProperty(connection, Const.HDR_CONTENT_TYPE, Const.APP_FORM);
-            bodyStr = WebbUtils.queryString(request.params);
-        } else if (request.payload == null) {
-            return null;
-        } else if (request.payload instanceof JSONObject) {
-            WebbUtils.ensureRequestProperty(connection, Const.HDR_CONTENT_TYPE, Const.APP_JSON);
-            bodyStr = jsonIndentFactor >= 0
-                    ? ((JSONObject) request.payload).toString(jsonIndentFactor)
-                    : request.payload.toString();
-        } else if (request.payload instanceof JSONArray) {
-            WebbUtils.ensureRequestProperty(connection, Const.HDR_CONTENT_TYPE, Const.APP_JSON);
-            bodyStr = jsonIndentFactor >= 0
-                    ? ((JSONArray) request.payload).toString(jsonIndentFactor)
-                    : request.payload.toString();
-        } else if (request.payload instanceof byte[]) {
-            WebbUtils.ensureRequestProperty(connection, Const.HDR_CONTENT_TYPE, Const.APP_BINARY);
-            requestBody = (byte[]) request.payload;
-        } else {
-            WebbUtils.ensureRequestProperty(connection, Const.HDR_CONTENT_TYPE, Const.TEXT_PLAIN);
-            bodyStr = request.payload.toString();
-        }
-        if (bodyStr != null) {
-            requestBody = bodyStr.getBytes(Const.UTF8);
-        }
-
-        if (requestBody == null) {
-            throw new IllegalStateException();
-        }
-
-        // only compress if the new body is smaller than uncompressed body
-        if (compress && requestBody.length > Const.MIN_COMPRESSED_ADVANTAGE) {
-            byte[] compressedBody = gzip(requestBody);
-            if (requestBody.length - compressedBody.length > Const.MIN_COMPRESSED_ADVANTAGE) {
-                requestBody = compressedBody;
-                connection.setRequestProperty(Const.HDR_CONTENT_ENCODING, "gzip");
-            }
-        }
-
-        connection.setFixedLengthStreamingMode(requestBody.length);
-
-        return requestBody;
-    }
-
-    static void setContentTypeAndLengthForStreaming(
-            HttpURLConnection connection,
-            Request request,
-            boolean compress) {
-
-        long length;
-
-        if (request.payload instanceof File) {
-            length = compress ? -1L : ((File) request.payload).length();
-        } else if (request.payload instanceof InputStream) {
-            length = -1L;
-        } else {
-            throw new IllegalStateException();
-        }
-
-        if (length > Integer.MAX_VALUE) {
-            length = -1L; // use chunked streaming mode
-        }
-
-        WebbUtils.ensureRequestProperty(connection, Const.HDR_CONTENT_TYPE, Const.APP_BINARY);
-        if (length < 0) {
-            connection.setChunkedStreamingMode(-1); // use default chunk size
-            if (compress) {
-                connection.setRequestProperty(Const.HDR_CONTENT_ENCODING, "gzip");
-            }
-        } else {
-            connection.setFixedLengthStreamingMode((int) length);
-        }
-    }
-
     static byte[] gzip(byte[] input) {
         GZIPOutputStream gzipOS = null;
         try {
             ByteArrayOutputStream byteArrayOS = new ByteArrayOutputStream();
             gzipOS = new GZIPOutputStream(byteArrayOS);
             gzipOS.write(input);
-            gzipOS.flush();
             gzipOS.close();
             gzipOS = null;
             return byteArrayOS.toByteArray();
@@ -303,7 +174,7 @@ public class WebbUtils {
         }
     }
 
-    static InputStream wrapStream(String contentEncoding, InputStream inputStream) throws IOException {
+    static InputStream decodeStream(String contentEncoding, InputStream inputStream) throws IOException {
         if (contentEncoding == null || "identity".equalsIgnoreCase(contentEncoding)) {
             return inputStream;
         }
@@ -316,65 +187,10 @@ public class WebbUtils {
         throw new WebbException("unsupported content-encoding: " + contentEncoding);
     }
 
-    static <T> void parseResponseBody(Class<T> clazz, Response<T> response, InputStream responseBodyStream)
-            throws UnsupportedEncodingException, IOException {
-
-        if (responseBodyStream == null || clazz == Void.class) {
-            return;
-        } else if (clazz == InputStream.class) {
-            response.setBody(responseBodyStream);
-            return;
-        }
-
-        byte[] responseBody = WebbUtils.readBytes(responseBodyStream);
-        // we are ignoring headers describing the content type of the response, instead
-        // try to force the content based on the type the client is expecting it (clazz)
-        if (clazz == String.class) {
-            response.setBody(new String(responseBody, Const.UTF8));
-        } else if (clazz == Const.BYTE_ARRAY_CLASS) {
-            response.setBody(responseBody);
-        } else if (clazz == JSONObject.class) {
-            response.setBody(WebbUtils.toJsonObject(responseBody));
-        } else if (clazz == JSONArray.class) {
-            response.setBody(WebbUtils.toJsonArray(responseBody));
-        }
-    }
-
-    static <T> void parseErrorResponse(Class<T> clazz, Response<T> response, InputStream responseBodyStream)
-            throws UnsupportedEncodingException, IOException {
-
-        if (responseBodyStream == null) {
-            return;
-        } else if (clazz == InputStream.class) {
-            response.errorBody = responseBodyStream;
-            return;
-        }
-
-        byte[] responseBody = WebbUtils.readBytes(responseBodyStream);
-        String contentType = response.connection.getContentType();
-        if (contentType == null || contentType.startsWith(Const.APP_BINARY) || clazz == Const.BYTE_ARRAY_CLASS) {
-            response.errorBody = responseBody;
-            return;
-        }
-
-        if (contentType.startsWith(Const.APP_JSON) && clazz == JSONObject.class) {
-            try {
-                response.errorBody = WebbUtils.toJsonObject(responseBody);
-                return;
-            } catch (Exception ignored) {
-                // ignored - was just a try!
-            }
-        }
-
-        // fallback to String if bytes are valid UTF-8 characters ...
+    static void closeQuietly(Closeable closeable) {
+        if (closeable == null) return;
         try {
-            response.errorBody = new String(responseBody, Const.UTF8);
-            return;
-        } catch (Exception ignored) {
-            // ignored - was just a try!
-        }
-
-        // last fallback - return error object as byte[]
-        response.errorBody = responseBody;
+            closeable.close();
+        } catch (IOException ignored) {}
     }
 }

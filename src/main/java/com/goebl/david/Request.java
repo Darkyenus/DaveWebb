@@ -1,10 +1,6 @@
 package com.goebl.david;
 
-import org.json.JSONArray;
-import org.json.JSONObject;
-
-import java.io.File;
-import java.io.InputStream;
+import java.io.*;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -17,37 +13,46 @@ import java.util.Map;
  * <a href="https://github.com/hgoebl/DavidWebb">github.com/hgoebl/DavidWebb</a>.
  * <br>
  *
+ * Most methods return this Request for chaining.
+ *
  * @author hgoebl
  */
-public class Request {
-    public enum Method {
-        GET, POST, PUT, DELETE
-    }
+@SuppressWarnings("WeakerAccess")
+public final class Request {
 
     private final Webb webb;
-    final Method method;
+
+    final HttpMethod method;
     final String uri;
+
+    Map<String, Object> headers;
 
     Map<String, Object> params;
     boolean multipleValues;
-    Map<String, Object> headers;
-    Object payload;
-    boolean streamPayload;
-    boolean useCaches;
-    Integer connectTimeout;
-    Integer readTimeout;
-    Long ifModifiedSince;
-    Boolean followRedirects;
+
+    boolean useCaches = false;
+    Integer connectTimeout = null;
+    Integer readTimeout = null;
+    Long ifModifiedSince = null;
+    Boolean followRedirects = null;
+
+    /** Content type of payload or null to guess (or that there is no payload) */
+    String payloadContentType = null;
+    /** Stream with data to be sent. Full stream will be sent. If not null, payloadData MUST be null. */
+    BodyStreamProvider payloadStream;
+    /** Bytes to be sent. All bytes will be sent. If not null, payloadStream MUST be null. */
+    byte[] payloadData;
+    /** Payload will be compressed if this flag is true and the payload is not too small */
+    boolean compressPayload;
+
     boolean ensureSuccess;
-    boolean compress;
     int retryCount;
     boolean waitExponential;
 
-    Request(Webb webb, Method method, String uri) {
+    Request(Webb webb, HttpMethod method, String uri) {
         this.webb = webb;
         this.method = method;
         this.uri = uri;
-        this.followRedirects = webb.followRedirects;
     }
 
     /**
@@ -161,8 +166,7 @@ public class Request {
      * Set (or overwrite) a HTTP header value.
      * <br>
      * Setting a header this way has the highest precedence and overrides a header value set on a {@link Webb}
-     * instance ({@link Webb#setDefaultHeader(String, Object)}) or a global header
-     * ({@link Webb#setGlobalHeader(String, Object)}).
+     * instance ({@link Webb#setDefaultHeader(String, Object)}).
      * <br>
      * Using <code>null</code> or empty String is not allowed for name and value.
      *
@@ -185,57 +189,81 @@ public class Request {
         return this;
     }
 
-    /**
-     * Set the payload for the request.
-     * <br>
-     * Using this method together with {@link #param(String, Object)} has the effect of <code>body</code> being
-     * ignored without notice. The method can be called more than once: the value will be stored and converted
-     * to bytes later.
-     * <br>
-     * Following types are supported for the body:
-     * <ul>
-     *     <li>
-     *         <code>null</code> clears the body
-     *     </li>
-     *     <li>
-     *         {@link org.json.JSONObject}, HTTP header 'Content-Type' will be set to JSON, if not set
-     *     </li>
-     *     <li>
-     *         {@link org.json.JSONArray}, HTTP header 'Content-Type' will be set to JSON, if not set
-     *     </li>
-     *     <li>
-     *         {@link java.lang.String}, HTTP header 'Content-Type' will be set to TEXT, if not set;
-     *         Text will be converted to UTF-8 bytes.
-     *     </li>
-     *     <li>
-     *         <code>byte[]</code> the easiest way for DavidWebb - it's just passed through.
-     *         HTTP header 'Content-Type' will be set to BINARY, if not set.
-     *     </li>
-     *     <li>
-     *         {@link java.io.File}, HTTP header 'Content-Type' will be set to BINARY, if not set;
-     *         The file gets streamed to the web-server and 'Content-Length' will be set to the number
-     *         of bytes of the file. There is absolutely no conversion done. So if you want to upload
-     *         e.g. a text-file and convert it to another encoding than stored on disk, you have to do
-     *         it by yourself.
-     *     </li>
-     *     <li>
-     *         {@link java.io.InputStream}, HTTP header 'Content-Type' will be set to BINARY, if not set;
-     *         Similar to <code>File</code>. Content-Length cannot be set (which has some drawbacks compared
-     *         to knowing the size of the body in advance).<br>
-     *         <strong>You have to care for closing the stream!</strong>
-     *     </li>
-     * </ul>
-     *
-     * @param body the payload
-     * @return <code>this</code> for method chaining (fluent API)
-     */
-    public Request body(Object body) {
-        if (method == Method.GET || method == Method.DELETE) {
-            throw new IllegalStateException("body not allowed for request method " + method);
+    private void ensureBodyCanBeSet() {
+        if (payloadData != null) {
+            throw new IllegalStateException("Body is already set to byte[]");
         }
-        this.payload = body;
-        this.streamPayload = body instanceof File || body instanceof InputStream;
+        if (payloadStream != null) {
+            throw new IllegalStateException("Body is already set to stream");
+        }
+        if (params != null) {
+            throw new IllegalStateException("Params are already set");
+        }
+        if (!method.canHaveBody) {
+            throw new IllegalStateException("Method "+method+" can't have body");
+        }
+    }
+
+    /** Set the payload for this request to the content of given file. Call only once. File will be streamed. */
+    public Request body(final File file, final String contentType) throws FileNotFoundException {
+        ensureBodyCanBeSet();
+        if (file == null) throw new NullPointerException("file");
+
+        this.payloadContentType = contentType;
+        this.payloadStream = new BodyStreamProvider<FileInputStream>() {
+            public FileInputStream createStream() throws Exception {
+                return new FileInputStream(file);
+            }
+
+            public long payloadSize(FileInputStream forStream) {
+                return file.length();
+            }
+
+            public void destroyStream(FileInputStream usedStream) {
+                WebbUtils.closeQuietly(usedStream);
+            }
+        };
         return this;
+    }
+
+    /** Set the payload for this request to the content of given stream. Call only once. Data will be streamed. */
+    public Request body(BodyStreamProvider stream, String contentType) {
+        ensureBodyCanBeSet();
+        if (stream == null) throw new NullPointerException("stream");
+
+        this.payloadContentType = contentType;
+        this.payloadStream = stream;
+        return this;
+    }
+
+    /** Set the payload for this request to the given bytes. Call only once. */
+    public Request body(byte[] data, String contentType) {
+        ensureBodyCanBeSet();
+        if (data == null) throw new NullPointerException("data");
+
+        this.payloadContentType = contentType;
+        this.payloadData = data;
+        return this;
+    }
+
+    /** Set the payload for this request to the given UTF8 bytes. Call only once.
+     * Content type is set to text/plain if null. */
+    public Request body(String data, String contentType) {
+        ensureBodyCanBeSet();
+        if (data == null) throw new NullPointerException("data");
+
+        try {
+            this.payloadData = data.getBytes(WebbConst.UTF8);
+            this.payloadContentType = contentType == null ? WebbConst.MIME_TEXT_PLAIN : contentType;
+        } catch (UnsupportedEncodingException e) {
+            throw new WebbException("Can't sent UTF-8 string", e);
+        }
+        return this;
+    }
+
+    /** Convenience call to {@link #body(String, String)} with json content type */
+    public Request bodyJson(String data) {
+        return body(data, WebbConst.MIME_JSON);
     }
 
     /**
@@ -246,13 +274,12 @@ public class Request {
      * compression for downloaded resources in mind, in special cases it makes absolutely sense to
      * compress the posted data.<br>
      * Your web application should inspect the 'Content-Encoding' header and implement the compression
-     * token provided by this client. By now only 'gzip' encoding token is used. If you need 'deflate'
-     * create an issue.
+     * token provided by this client. By now only 'gzip' encoding token is used.
      *
      * @return <code>this</code> for method chaining (fluent API)
      */
     public Request compress() {
-        compress = true;
+        compressPayload = true;
         return this;
     }
 
@@ -311,7 +338,7 @@ public class Request {
      *     </a>.
      * <br>
      * Use this method to set the behaviour for this single request when receiving redirect responses.
-     * If you want to change the behaviour for all your requests, call {@link Webb#setFollowRedirects(boolean)}.
+     * If you want to change the behaviour for all your requests, use {@link Webb#setFollowRedirects(boolean)}.
      * @param auto <code>true</code> to automatically follow redirects (HTTP status code 3xx).
      *             Default value comes from HttpURLConnection and should be <code>true</code>.
      * @return <code>this</code> for method chaining (fluent API)
@@ -367,51 +394,32 @@ public class Request {
     }
 
     /**
-     * Execute the request and expect the result to be convertible to <code>String</code>.
-     * @return the created <code>Response</code> object carrying the payload from the server as <code>String</code>
+     * Execute the request with given translator.
+     * @return the created <code>Response</code> object carrying the payload from the server as <code>T</code>
      */
-    public Response<String> asString() {
-        return webb.execute(this, String.class);
-    }
-
-    /**
-     * Execute the request and expect the result to be convertible to <code>JSONObject</code>.
-     * @return the created <code>Response</code> object carrying the payload from the server as <code>JSONObject</code>
-     */
-    public Response<JSONObject> asJsonObject() {
-        return webb.execute(this, JSONObject.class);
-    }
-
-    /**
-     * Execute the request and expect the result to be convertible to <code>JSONArray</code>.
-     * @return the created <code>Response</code> object carrying the payload from the server as <code>JSONArray</code>
-     */
-    public Response<JSONArray> asJsonArray() {
-        return webb.execute(this, JSONArray.class);
-    }
-
-    /**
-     * Execute the request and expect the result to be convertible to <code>byte[]</code>.
-     * @return the created <code>Response</code> object carrying the payload from the server as <code>byte[]</code>
-     */
-    public Response<byte[]> asBytes() {
-        return (Response<byte[]>) webb.execute(this, Const.BYTE_ARRAY_CLASS);
-    }
-
-    /**
-     * Execute the request and expect the result to be convertible to <code>InputStream</code>.
-     * @return the created <code>Response</code> object carrying the payload from the server as <code>InputStream</code>
-     */
-    public Response<InputStream> asStream() {
-        return webb.execute(this, InputStream.class);
+    public <T> Response<T> execute(ResponseTranslator<T> translator) {
+        return webb.execute(this, translator);
     }
 
     /**
      * Execute the request and expect no result payload (only status-code and headers).
      * @return the created <code>Response</code> object where no payload is expected or simply will be ignored.
      */
-    public Response<Void> asVoid() {
-        return webb.execute(this, Void.class);
+    public Response<Void> execute() {
+        return webb.execute(this, null);
+    }
+
+    public interface BodyStreamProvider <Stream extends InputStream> {
+        /** Called when stream is needed to write to the server. May be called again
+         * after {@link #destroyStream(InputStream)}, if the request failed and must be performed again. */
+        Stream createStream() throws Exception;
+
+        /** Called with stream returned by createStream to get the size of stream. This amount (in bytes) must be correct.
+         * If it is not possible to tell, return -1. */
+        long payloadSize(Stream forStream);
+
+        /** Called always after createStream with previously returned stream. Close the stream here, if needed. */
+        void destroyStream(Stream usedStream);
     }
 
 }

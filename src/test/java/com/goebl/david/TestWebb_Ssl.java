@@ -42,7 +42,7 @@ public class TestWebb_Ssl extends AbstractTestWebb {
         webb.setHostnameVerifier(new TrustingHostnameVerifier());
 
         // www.wellcrafted.de has same IP as www.goebl.com, but certificate is for www.goebl.com
-        Response<Void> response = webb.get("https://localhost:13003/").asVoid();
+        Response<Void> response = webb.get("https://localhost:13003/").execute();
         assertTrue(response.isSuccess());
     }
 
@@ -56,7 +56,7 @@ public class TestWebb_Ssl extends AbstractTestWebb {
         webb.setSSLSocketFactory(sslContext.getSocketFactory());
         webb.setHostnameVerifier(new TrustingHostnameVerifier());
 
-        Response<Void> response = webb.get("https://localhost:13003/").asVoid();
+        Response<Void> response = webb.get("https://localhost:13003/").execute();
         assertTrue(response.isSuccess() || response.getStatusCode() == 301);
     }
 

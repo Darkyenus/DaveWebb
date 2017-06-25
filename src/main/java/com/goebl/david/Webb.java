@@ -1,17 +1,10 @@
 package com.goebl.david;
 
-import java.io.FilterInputStream;
-import org.json.JSONArray;
-import org.json.JSONObject;
+import java.io.*;
 
 import javax.net.ssl.HostnameVerifier;
 import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLSocketFactory;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.HashMap;
@@ -20,128 +13,62 @@ import java.util.Map;
 import java.util.zip.GZIPOutputStream;
 
 /**
- * Lightweight Java HTTP-Client for calling JSON REST-Services (especially for Android).
+ * Entry-point for the HTTP(S) client, with its settings and methods to do work.
  *
  * @author hgoebl
  */
-public class Webb {
-    public static final String DEFAULT_USER_AGENT = Const.DEFAULT_USER_AGENT;
-    public static final String APP_FORM = Const.APP_FORM;
-    public static final String APP_JSON = Const.APP_JSON;
-    public static final String APP_BINARY = Const.APP_BINARY;
-    public static final String TEXT_PLAIN = Const.TEXT_PLAIN;
-    public static final String HDR_CONTENT_TYPE = Const.HDR_CONTENT_TYPE;
-    public static final String HDR_CONTENT_ENCODING = Const.HDR_CONTENT_ENCODING;
-    public static final String HDR_ACCEPT = Const.HDR_ACCEPT;
-    public static final String HDR_ACCEPT_ENCODING = Const.HDR_ACCEPT_ENCODING;
-    public static final String HDR_USER_AGENT = Const.HDR_USER_AGENT;
-    public static final String HDR_AUTHORIZATION = "Authorization";
+@SuppressWarnings("WeakerAccess")
+public final class Webb {
 
-    static final Map<String, Object> globalHeaders = new LinkedHashMap<String, Object>();
-    static String globalBaseUri;
+    private final String baseUri;
 
-    static Integer connectTimeout = 10000; // 10 seconds
-    static Integer readTimeout = 3 * 60000; // 5 minutes
-    static int jsonIndentFactor = -1;
+    private int connectTimeout = 10000; // 10 seconds
+    private int readTimeout = 3 * 60000; // 3 minutes
+    private boolean followRedirects = true;
 
-    Boolean followRedirects;
-    String baseUri;
-    Map<String, Object> defaultHeaders;
-    SSLSocketFactory sslSocketFactory;
-    HostnameVerifier hostnameVerifier;
-    RetryManager retryManager;
-
-    protected Webb() {}
+    private Map<String, Object> defaultHeaders = null;
+    private SSLSocketFactory sslSocketFactory = null;
+    private HostnameVerifier hostnameVerifier = null;
+    private RetryManager retryManager = RetryManager.DEFAULT;
 
     /**
-     * Create an instance which can be reused for multiple requests in the same Thread.
-     * @return the created instance.
+     * @param baseUri For all requests this value is taken as a kind of prefix for the effective URI, so you can address
+     *                  the URIs relatively. null means no prefix.
      */
-    public static Webb create() {
-        return new Webb();
+    public Webb(String baseUri) {
+        this.baseUri = baseUri;
     }
 
     /**
-     * Set the value for a named header which is valid for all requests in the running JVM.
-     * <br>
-     * The value can be overwritten by calling {@link Webb#setDefaultHeader(String, Object)} and/or
-     * {@link com.goebl.david.Request#header(String, Object)}.
-     * <br>
-     * For the supported types for values see {@link Request#header(String, Object)}.
-     *
-     * @param name name of the header (regarding HTTP it is not case-sensitive, but here case is important).
-     * @param value value of the header. If <code>null</code> the header value is cleared (effectively not set).
-     *
-     * @see #setDefaultHeader(String, Object)
-     * @see com.goebl.david.Request#header(String, Object)
+     * See <a href="http://docs.oracle.com/javase/7/docs/api/java/net/HttpURLConnection.html#setInstanceFollowRedirects(boolean)"></a>
+     * @param followRedirects <code>true</code> to automatically follow redirects (HTTP status code 3xx).
      */
-    public static void setGlobalHeader(String name, Object value) {
-        if (value != null) {
-            globalHeaders.put(name, value);
-        } else {
-            globalHeaders.remove(name);
-        }
-    }
-
-    /**
-     * Set the base URI for all requests starting in this JVM from now.
-     * <br>
-     * For all requests this value is taken as a kind of prefix for the effective URI, so you can address
-     * the URIs relatively. The value is only taken when {@link Webb#setBaseUri(String)} is not called or
-     * called with <code>null</code>.
-     *
-     * @param globalBaseUri the prefix for all URIs of new Requests.
-     * @see #setBaseUri(String)
-     */
-    public static void setGlobalBaseUri(String globalBaseUri) {
-        Webb.globalBaseUri = globalBaseUri;
-    }
-
-    /**
-     * The number of characters to indent child properties, <code>-1</code> for "productive" code.
-     * <br>
-     * Default is production ready JSON (-1) means no indentation (single-line serialization).
-     * @param indentFactor the number of spaces to indent
-     */
-    public static void setJsonIndentFactor(int indentFactor) {
-        Webb.jsonIndentFactor = indentFactor;
+    public void setFollowRedirects(boolean followRedirects) {
+        this.followRedirects = followRedirects;
     }
 
     /**
      * Set the timeout in milliseconds for connecting the server.
      * <br>
-     * In contrast to {@link java.net.HttpURLConnection}, we use a default timeout of 10 seconds, since no
-     * timeout is odd.<br>
+     * Default timeout is 10 seconds.
+     * <br>
      * Can be overwritten for each Request with {@link com.goebl.david.Request#connectTimeout(int)}.
-     * @param globalConnectTimeout the new timeout or <code>&lt;= 0</code> to use HttpURLConnection default timeout.
+     * @param connectTimeout the new timeout or <code>&lt;= 0</code> to disable timeouts.
      */
-    public static void setConnectTimeout(int globalConnectTimeout) {
-        connectTimeout = globalConnectTimeout > 0 ? globalConnectTimeout : null;
+    public void setConnectTimeout(int connectTimeout) {
+        this.connectTimeout = connectTimeout;
     }
 
     /**
      * Set the timeout in milliseconds for getting response from the server.
      * <br>
-     * In contrast to {@link java.net.HttpURLConnection}, we use a default timeout of 3 minutes, since no
-     * timeout is odd.<br>
-     * Can be overwritten for each Request with {@link com.goebl.david.Request#readTimeout(int)}.
-     * @param globalReadTimeout the new timeout or <code>&lt;= 0</code> to use HttpURLConnection default timeout.
-     */
-    public static void setReadTimeout(int globalReadTimeout) {
-        readTimeout = globalReadTimeout > 0 ? globalReadTimeout : null;
-    }
-
-    /**
-     * See <a href="http://docs.oracle.com/javase/7/docs/api/java/net/HttpURLConnection.html#setInstanceFollowRedirects(boolean)">
-     *     </a>.
+     * Default timeout is 3 minutes.
      * <br>
-     * Use this method to set the behaviour for all requests created by this instance when receiving redirect responses.
-     * You can overwrite the setting for a single request by calling {@link Request#followRedirects(boolean)}.
-     * @param auto <code>true</code> to automatically follow redirects (HTTP status code 3xx).
-     *             Default value comes from HttpURLConnection and should be <code>true</code>.
+     * Can be overwritten for each Request with {@link com.goebl.david.Request#readTimeout(int)}.
+     * @param readTimeout the new timeout or <code>&lt;= 0</code> to disable timeouts.
      */
-    public void setFollowRedirects(boolean auto) {
-        this.followRedirects = auto;
+    public void setReadTimeout(int readTimeout) {
+        this.readTimeout = readTimeout;
     }
 
     /**
@@ -161,19 +88,6 @@ public class Webb {
     }
 
     /**
-     * Set the base URI for all requests created from this instance.
-     * <br>
-     * For all requests this value is taken as a kind of prefix for the effective URI, so you can address
-     * the URIs relatively. The value takes precedence over the value set in {@link #setGlobalBaseUri(String)}.
-     *
-     * @param baseUri the prefix for all URIs of new Requests.
-     * @see #setGlobalBaseUri(String)
-     */
-    public void setBaseUri(String baseUri) {
-        this.baseUri = baseUri;
-    }
-
-    /**
      * Returns the base URI of this instance.
      *
      * @return base URI
@@ -185,7 +99,7 @@ public class Webb {
     /**
      * Set the value for a named header which is valid for all requests created by this instance.
      * <br>
-     * The value takes precedence over {@link Webb#setGlobalHeader(String, Object)} but can be overwritten by
+     * The value can be overwritten by
      * {@link com.goebl.david.Request#header(String, Object)}.
      * <br>
      * For the supported types for values see {@link Request#header(String, Object)}.
@@ -194,7 +108,6 @@ public class Webb {
      * @param value value of the header. If <code>null</code> the header value is cleared (effectively not set).
      *              When setting the value to null, a value from global headers can shine through.
      *
-     * @see #setGlobalHeader(String, Object)
      * @see com.goebl.david.Request#header(String, Object)
      */
     public void setDefaultHeader(String name, Object value) {
@@ -210,9 +123,10 @@ public class Webb {
 
     /**
      * Registers an alternative {@link com.goebl.david.RetryManager}.
-     * @param retryManager the new manager for deciding whether it makes sense to retry a request.
+     * @param retryManager the new manager for deciding whether it makes sense to retry a request. Not null.
      */
     public void setRetryManager(RetryManager retryManager) {
+        if (retryManager == null) throw new NullPointerException("retryManager");
         this.retryManager = retryManager;
     }
 
@@ -223,7 +137,7 @@ public class Webb {
      * @return the created Request object (in fact it's more a builder than a real request object)
      */
     public Request get(String pathOrUri) {
-        return new Request(this, Request.Method.GET, buildPath(pathOrUri));
+        return new Request(this, HttpMethod.GET, buildPath(pathOrUri));
     }
 
     /**
@@ -233,7 +147,7 @@ public class Webb {
      * @return the created Request object (in fact it's more a builder than a real request object)
      */
     public Request post(String pathOrUri) {
-        return new Request(this, Request.Method.POST, buildPath(pathOrUri));
+        return new Request(this, HttpMethod.POST, buildPath(pathOrUri));
     }
 
     /**
@@ -243,7 +157,7 @@ public class Webb {
      * @return the created Request object (in fact it's more a builder than a real request object)
      */
     public Request put(String pathOrUri) {
-        return new Request(this, Request.Method.PUT, buildPath(pathOrUri));
+        return new Request(this, HttpMethod.PUT, buildPath(pathOrUri));
     }
 
     /**
@@ -253,7 +167,7 @@ public class Webb {
      * @return the created Request object (in fact it's more a builder than a real request object)
      */
     public Request delete(String pathOrUri) {
-        return new Request(this, Request.Method.DELETE, buildPath(pathOrUri));
+        return new Request(this, HttpMethod.DELETE, buildPath(pathOrUri));
     }
 
     private String buildPath(String pathOrUri) {
@@ -263,23 +177,23 @@ public class Webb {
         if (pathOrUri.startsWith("http://") || pathOrUri.startsWith("https://")) {
             return pathOrUri;
         }
-        String myBaseUri = baseUri != null ? baseUri : globalBaseUri;
-        return myBaseUri == null ? pathOrUri : myBaseUri + pathOrUri;
+        if (baseUri != null) {
+            return baseUri + pathOrUri;
+        } else {
+            return pathOrUri;
+        }
     }
 
-    <T> Response<T> execute(Request request, Class<T> clazz) {
+    <T> Response<T> execute(Request request, ResponseTranslator<T> translator) {
         Response<T> response = null;
 
         if (request.retryCount == 0) {
             // no retry -> just delegate to inner method
-            response = _execute(request, clazz);
+            response = _execute(request, translator);
         } else {
-            if (retryManager == null) {
-                retryManager = RetryManager.DEFAULT;
-            }
             for (int tries = 0; tries <= request.retryCount; ++tries) {
                 try {
-                    response = _execute(request, clazz);
+                    response = _execute(request, translator);
                     if (tries >= request.retryCount || !retryManager.isRetryUseful(response)) {
                         break;
                     }
@@ -304,108 +218,151 @@ public class Webb {
         return response;
     }
 
-    private <T> Response<T> _execute(Request request, Class<T> clazz) {
-        Response<T> response = new Response<T>(request);
-
+    private <T> Response<T> _execute(Request request, ResponseTranslator<T> translator) {
         InputStream is = null;
         boolean closeStream = true;
         HttpURLConnection connection = null;
 
+        Response<T> response = null;
+
         try {
             String uri = request.uri;
-            if (request.method == Request.Method.GET &&
-                    !uri.contains("?") &&
-                    request.params != null &&
-                    !request.params.isEmpty()) {
-                uri += "?" + WebbUtils.queryString(request.params);
+            if (!request.method.canHaveBody && request.params != null && !request.params.isEmpty()) {
+                if (uri.indexOf('?') != -1) {
+                    uri = uri + '&' + WebbUtils.queryString(request.params);
+                } else {
+                    uri = uri + '?' + WebbUtils.queryString(request.params);
+                }
             }
             URL apiUrl = new URL(uri);
             connection = (HttpURLConnection) apiUrl.openConnection();
 
             prepareSslConnection(connection);
             connection.setRequestMethod(request.method.name());
-            if (request.followRedirects != null) {
-                connection.setInstanceFollowRedirects(request.followRedirects);
-            }
+            connection.setInstanceFollowRedirects(request.followRedirects == null ? followRedirects : request.followRedirects);
             connection.setUseCaches(request.useCaches);
-            setTimeouts(request, connection);
+            connection.setConnectTimeout(request.connectTimeout == null ? connectTimeout : request.connectTimeout);
+            connection.setReadTimeout(request.readTimeout == null ? readTimeout : request.readTimeout);
             if (request.ifModifiedSince != null) {
                 connection.setIfModifiedSince(request.ifModifiedSince);
             }
 
             WebbUtils.addRequestProperties(connection, mergeHeaders(request.headers));
-            if (clazz == JSONObject.class || clazz == JSONArray.class) {
-                WebbUtils.ensureRequestProperty(connection, HDR_ACCEPT, APP_JSON);
-            }
 
-            if (request.method != Request.Method.GET && request.method != Request.Method.DELETE) {
-                if (request.streamPayload) {
-                    WebbUtils.setContentTypeAndLengthForStreaming(connection, request, request.compress);
-                    connection.setDoOutput(true);
-                    streamBody(connection, request.payload, request.compress);
-                } else {
-                    byte[] requestBody = WebbUtils.getPayloadAsBytesAndSetContentType(
-                            connection, request, request.compress, jsonIndentFactor);
+            if (request.method.canHaveBody) {
+                final Request.BodyStreamProvider payloadStream = request.payloadStream;
+                final byte[] payloadData = request.payloadData;
 
-                    if (requestBody != null) {
-                        connection.setDoOutput(true);
-                        writeBody(connection, requestBody);
+                if (payloadStream != null) {
+                    WebbUtils.ensureRequestProperty(connection, WebbConst.HDR_CONTENT_TYPE, request.payloadContentType != null ? request.payloadContentType : WebbConst.MIME_BINARY);
+
+                    InputStream stream = payloadStream.createStream();
+
+                    long length = -1;
+
+                    if (!request.compressPayload) {
+                        //noinspection unchecked
+                        length = payloadStream.payloadSize(stream);
                     }
-                }
-            } else {
-                connection.connect();
-            }
 
-            response.connection = connection;
-            response.statusCode = connection.getResponseCode();
-            response.responseMessage = connection.getResponseMessage();
+                    if (length > Integer.MAX_VALUE) {
+                        length = -1L; // use chunked streaming mode
+                    }
+
+                    if (length < 0) {
+                        connection.setChunkedStreamingMode(-1); // use default chunk size
+                        if (request.compressPayload) {
+                            connection.setRequestProperty(WebbConst.HDR_CONTENT_ENCODING, "gzip");
+                        }
+                    } else {
+                        connection.setFixedLengthStreamingMode((int) length);
+                    }
+
+                    connection.setDoOutput(true);
+
+                    // "E/StrictMode﹕ A resource was acquired at attached stack trace but never released"
+                    // see comments about this problem in #writeBody()
+                    OutputStream os = null;
+                    try {
+                        os = connection.getOutputStream();
+
+                        if (request.compressPayload) {
+                            GZIPOutputStream gos = new GZIPOutputStream(os);
+                            WebbUtils.copyStream(stream, gos);
+                            gos.finish();
+                        } else {
+                            WebbUtils.copyStream(stream, os);
+                        }
+
+                        os.flush();
+                    } finally {
+                        if (os != null) {
+                            try { os.close(); } catch (Exception ignored) {}
+                        }
+
+                        //noinspection unchecked
+                        payloadStream.destroyStream(stream);
+                    }
+                } else if (payloadData != null || request.params != null) {
+                    byte[] sentPayloadData;
+                    if (payloadData != null) {
+                        sentPayloadData = payloadData;
+                        WebbUtils.ensureRequestProperty(connection, WebbConst.HDR_CONTENT_TYPE, request.payloadContentType != null ? request.payloadContentType : WebbConst.MIME_BINARY);
+                    } else {
+                        sentPayloadData = WebbUtils.queryString(request.params).getBytes(WebbConst.UTF8);
+                        WebbUtils.ensureRequestProperty(connection, WebbConst.HDR_CONTENT_TYPE, WebbConst.MIME_URLENCODED);
+                    }
+
+
+                    // only compress if the new body is smaller than uncompressed body
+                    if (request.compressPayload && sentPayloadData.length > WebbConst.MIN_COMPRESSED_ADVANTAGE) {
+                        byte[] compressedBody = WebbUtils.gzip(payloadData);
+                        if (sentPayloadData.length - compressedBody.length > WebbConst.MIN_COMPRESSED_ADVANTAGE) {
+                            sentPayloadData = compressedBody;
+                            connection.setRequestProperty(WebbConst.HDR_CONTENT_ENCODING, "gzip");
+                        }
+                    }
+
+                    connection.setFixedLengthStreamingMode(sentPayloadData.length);
+                    connection.setDoOutput(true);
+                    writeBody(connection, sentPayloadData);
+                }
+            }
+            connection.connect();
+
+            response = new Response<T>(request, connection);
 
             // get the response body (if any)
-            is = response.isSuccess() ? connection.getInputStream() : connection.getErrorStream();
-            is = WebbUtils.wrapStream(connection.getContentEncoding(), is);
-
-            if (clazz == InputStream.class) {
-                is = new AutoDisconnectInputStream(connection, is);
-            }
             if (response.isSuccess()) {
-                WebbUtils.parseResponseBody(clazz, response, is);
+                is = connection.getInputStream();
             } else {
-                WebbUtils.parseErrorResponse(clazz, response, is);
+                is = connection.getErrorStream();
+                if (is == null) {
+                    is = connection.getInputStream();
+                }
             }
-            if (clazz == InputStream.class) {
-                closeStream = false;
+            is = WebbUtils.decodeStream(connection.getContentEncoding(), is);
+
+            if (translator == null) {
+                response.body = null;
+            } else {
+                //noinspection unchecked
+                response.body = translator.decode(response, is);
             }
 
             return response;
-
         } catch (WebbException e) {
-
+            e.response = response;
             throw e;
-
         } catch (Exception e) {
-
-            throw new WebbException(e);
-
+            final WebbException exception = new WebbException(e);
+            exception.response = response;
+            throw exception;
         } finally {
-            if (closeStream) {
-                if (is != null) {
-                    try { is.close(); } catch (Exception ignored) {}
-                }
-                if (connection != null) {
-                    try { connection.disconnect(); } catch (Exception ignored) {}
-                }
+            WebbUtils.closeQuietly(is);
+            if (connection != null) {
+                try { connection.disconnect(); } catch (Exception ignored) {}
             }
-        }
-    }
-
-    private void setTimeouts(Request request, HttpURLConnection connection) {
-        if (request.connectTimeout != null || connectTimeout != null) {
-            connection.setConnectTimeout(
-                    request.connectTimeout != null ? request.connectTimeout : connectTimeout);
-        }
-        if (request.readTimeout != null || readTimeout != null) {
-            connection.setReadTimeout(
-                    request.readTimeout != null ? request.readTimeout : readTimeout);
         }
     }
 
@@ -428,40 +385,8 @@ public class Webb {
         }
     }
 
-    private void streamBody(HttpURLConnection connection, Object body, boolean compress) throws IOException {
-        InputStream is;
-        boolean closeStream;
-
-        if (body instanceof File) {
-            is = new FileInputStream((File) body);
-            closeStream = true;
-        } else {
-            is = (InputStream) body;
-            closeStream = false;
-        }
-
-        // "E/StrictMode﹕ A resource was acquired at attached stack trace but never released"
-        // see comments about this problem in #writeBody()
-        OutputStream os = null;
-        try {
-            os = connection.getOutputStream();
-            if (compress) {
-                os = new GZIPOutputStream(os);
-            }
-            WebbUtils.copyStream(is, os);
-            os.flush();
-        } finally {
-            if (os != null) {
-                try { os.close(); } catch (Exception ignored) {}
-            }
-            if (is != null && closeStream) {
-                try { is.close(); } catch (Exception ignored) {}
-            }
-        }
-    }
-
     private void prepareSslConnection(HttpURLConnection connection) {
-        if ((hostnameVerifier != null || sslSocketFactory != null) && connection instanceof HttpsURLConnection) {
+        if (connection instanceof HttpsURLConnection) {
             HttpsURLConnection sslConnection = (HttpsURLConnection) connection;
             if (hostnameVerifier != null) {
                 sslConnection.setHostnameVerifier(hostnameVerifier);
@@ -472,16 +397,10 @@ public class Webb {
         }
     }
 
-    Map<String, Object> mergeHeaders(Map<String, Object> requestHeaders) {
+    private Map<String, Object> mergeHeaders(Map<String, Object> requestHeaders) {
         Map<String, Object> headers = null;
-        if (!globalHeaders.isEmpty()) {
-            headers = new LinkedHashMap<String, Object>();
-            headers.putAll(globalHeaders);
-        }
         if (defaultHeaders != null) {
-            if (headers == null) {
-                headers = new LinkedHashMap<String, Object>();
-            }
+            headers = new LinkedHashMap<String, Object>();
             headers.putAll(defaultHeaders);
         }
         if (requestHeaders != null) {
@@ -492,39 +411,5 @@ public class Webb {
             }
         }
         return headers;
-    }
-
-    /**
-     * Disconnect the underlying <code>HttpURLConnection</code> on close.
-     */
-    private static class AutoDisconnectInputStream extends FilterInputStream {
-
-        /**
-         * The underlying <code>HttpURLConnection</code>.
-         */
-        private final HttpURLConnection connection;
-
-        /**
-         * Creates an <code>AutoDisconnectInputStream</code>
-         * by assigning the  argument <code>in</code>
-         * to the field <code>this.in</code> so as
-         * to remember it for later use.
-         * @param connection the underlying connection to disconnect on close.
-         * @param in the underlying input stream, or <code>null</code> if
-         * this instance is to be created without an underlying stream.
-         */
-        protected AutoDisconnectInputStream(final HttpURLConnection connection, final InputStream in) {
-            super(in);
-            this.connection = connection;
-        }
-
-        @Override
-        public void close() throws IOException {
-            try {
-                super.close();
-            } finally {
-                connection.disconnect();
-            }
-        }
     }
 }

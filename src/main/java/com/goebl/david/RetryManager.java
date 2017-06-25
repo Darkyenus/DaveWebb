@@ -7,9 +7,8 @@ import java.net.SocketTimeoutException;
  * Decides whether a request should be retried or not.
  * <br>
  * If you need other behaviour, just extend this class.
- *
- * @since 27.04.14.
  */
+@SuppressWarnings("WeakerAccess")
 public class RetryManager {
     /** seconds to wait until next retry */
     protected static final int[] BACKOFF = { 1, 2, 4, 7, 12, 20, 30, 60, 120 };

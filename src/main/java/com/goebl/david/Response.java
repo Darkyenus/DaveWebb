@@ -1,27 +1,42 @@
 package com.goebl.david;
 
+import java.io.IOException;
 import java.net.HttpURLConnection;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Holds data about the response message returning from HTTP request.
  *
  * @author hgoebl
  */
-public class Response<T> {
-    final Request request;
+@SuppressWarnings("WeakerAccess")
+public final class Response<T> {
 
-    int statusCode;
-    String responseMessage;
+    private final Request request;
+
+    private final int statusCode;
+    private final String statusMessage;
+    private final String statusLine;
+
+    private final Map<String, List<String>> headers;
+    private final String contentType;
+    private final long date, expiration, lastModified;
+
     T body;
-    Object errorBody;
-    HttpURLConnection connection;
 
-    Response(Request request) {
+    Response(Request request, HttpURLConnection connection) throws IOException {
         this.request = request;
-    }
 
-    void setBody(Object body) {
-        this.body = (T) body;
+        this.statusCode = connection.getResponseCode();
+        this.statusMessage = connection.getResponseMessage();
+        this.statusLine = connection.getHeaderField(0);
+
+        this.headers = connection.getHeaderFields();
+        this.contentType = connection.getContentType();
+        this.date = connection.getDate();
+        this.expiration = connection.getExpiration();
+        this.lastModified = connection.getLastModified();
     }
 
     /**
@@ -30,38 +45,6 @@ public class Response<T> {
      */
     public Request getRequest() {
         return request;
-    }
-
-    /**
-     * Returns the payload of the response converted to the given type.
-     * @return the converted payload (can be null).
-     */
-    public T getBody() {
-        return body;
-    }
-
-    /**
-     * Get the body which was returned in case of error (HTTP-Code &gt;= 400).
-     * <br>
-     * The type of the error body depends on following factors:
-     * <ul>
-     *     <li>
-     *         <code>Content-Type</code> header (overrules the expected return type of the response)
-     *     </li>
-     *     <li>
-     *         The expected type (see <code>asXyz()</code>). We try to coerce the error body to this type.
-     *         In case of REST services, where often a JSONObject is the normal response body, the error body
-     *         will be converted to JSONObject if possible. <code>JSONArray</code> is not expected to be the
-     *         error body.
-     *     </li>
-     * </ul>
-     * If converting the error body is not successful, <code>String</code> and <code>byte[]</code> is used as
-     * a fallback. You have to check the type with <code>instanceof</code> or try/catch the cast.
-     * @return the error body converted to an object (see above) or <code>null</code> if there is no body or
-     *         no error.
-     */
-    public Object getErrorBody() {
-        return errorBody;
     }
 
     /**
@@ -74,11 +57,19 @@ public class Response<T> {
     }
 
     /**
+     * Returns the text explaining the status code.
+     * @return e.g. "Moved Permanently", "Created", ...
+     */
+    public String getStatusMessage() {
+        return statusMessage;
+    }
+
+    /**
      * The first line returned by the web-server, like "HTTP/1.1 200 OK".
      * @return first header
      */
     public String getStatusLine() {
-        return connection.getHeaderField(null);
+        return statusLine;
     }
 
     /**
@@ -86,15 +77,7 @@ public class Response<T> {
      * @return <code>true</code> when status code is between 200 and 299, else <code>false</code>
      */
     public boolean isSuccess() {
-        return (statusCode / 100) == 2; // 200, 201, 204, ...
-    }
-
-    /**
-     * Returns the text explaining the status code.
-     * @return e.g. "Moved Permanently", "Created", ...
-     */
-    public String getResponseMessage() {
-        return responseMessage;
+        return statusCode >= 200 && statusCode < 300;
     }
 
     /**
@@ -106,7 +89,15 @@ public class Response<T> {
      * @return e.g. "application/json", "text/plain", ...
      */
     public String getContentType() {
-        return connection.getContentType();
+        return contentType;
+    }
+
+    /**
+     * Returns the payload of the response converted to the given type.
+     * @return the converted payload (can be null).
+     */
+    public T getBody() {
+        return body;
     }
 
     /**
@@ -118,7 +109,7 @@ public class Response<T> {
      * @return the parsed "Date" header as millis or <code>0</code> if this header was not set.
      */
     public long getDate() {
-        return connection.getDate();
+        return date;
     }
 
     /**
@@ -130,7 +121,7 @@ public class Response<T> {
      * @return the expiration date of the resource, or 0 if not known.
      */
     public long getExpiration() {
-        return connection.getExpiration();
+        return expiration;
     }
 
     /**
@@ -142,56 +133,47 @@ public class Response<T> {
      * @return the date the resource was last modified, or 0 if not known.
      */
     public long getLastModified() {
-        return connection.getLastModified();
+        return lastModified;
     }
 
     /**
      * Returns the value of the named header field.
-     * <br>
-     * See <a href="http://docs.oracle.com/javase/7/docs/api/java/net/URLConnection.html#getHeaderField(java.lang.String)">
-     *     URLConnection.getHeaderField()</a>
+     * If there is multiple values, last is returned.
      *
-     * @param name name of the header field
+     * @param name of the header field
      * @return the value of the named header field, or null
      */
     public String getHeaderField (String name) {
-        return connection.getHeaderField(name);
-    }
-
-    /**
-     * Returns the value of the named field parsed as date (Millis since 1970).
-     * <br>
-     * See <a href="http://docs.oracle.com/javase/7/docs/api/java/net/URLConnection.html#getHeaderFieldDate(java.lang.String,+long)">
-     *     URLConnection.getHeaderFieldDate()</a>
-     *
-     * @param field name of the header field
-     * @param defaultValue the default value if the field is not present or malformed
-     * @return the value of the named header field, or the given default value
-     */
-    public long getHeaderFieldDate (String field, long defaultValue) {
-        return connection.getHeaderFieldDate(field, defaultValue);
+        final List<String> values = headers.get(name);
+        if (values == null || values.isEmpty()) {
+            return null;
+        }
+        return values.get(values.size() - 1);
     }
 
     /**
      * Returns the value of the named field parsed as a number.
-     * <br>
-     * See <a href="http://docs.oracle.com/javase/7/docs/api/java/net/URLConnection.html#getHeaderFieldInt(java.lang.String,+int)">
-     *     URLConnection.getHeaderFieldInt()</a>
      *
-     * @param field name of the header field
+     * @param name of the header field
      * @param defaultValue the default value if the field is not present or malformed
      * @return the value of the named header field, or the given default value
+     * @see #getHeaderField(String) for header field resolution
      */
-    public int getHeaderFieldInt(String field, int defaultValue) {
-        return connection.getHeaderFieldInt(field, defaultValue);
+    public long getHeaderFieldInt(String name, long defaultValue) {
+        final String value = getHeaderField(name);
+        if (value == null) return defaultValue;
+        try {
+            return Long.parseLong(value);
+        } catch (NumberFormatException ex) {
+            return defaultValue;
+        }
     }
 
     /**
-     * Get the "real" connection, typically to call some getters which are not provided by this Response object.
-     * @return the connection object (many methods throw IllegalStateException depending on the internal state).
+     * @return headers returned by the server
      */
-    public HttpURLConnection getConnection() {
-        return connection;
+    public Map<String, List<String>> getHeaders() {
+        return headers;
     }
 
     /**
@@ -203,7 +185,7 @@ public class Response<T> {
      */
     public void ensureSuccess() {
         if (!isSuccess()) {
-            throw new WebbException("Request failed: " + statusCode + " " + responseMessage, (Response) this);
+            throw new WebbException("Request failed: " + statusCode + " " + statusMessage, this);
         }
     }
 }

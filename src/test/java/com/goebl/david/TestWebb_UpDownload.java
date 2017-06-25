@@ -53,7 +53,7 @@ public class TestWebb_UpDownload extends AbstractTestWebb {
         Response<Void> response = webb
                 .post("/upload?file")
                 .body(TEST_FILE)
-                .asVoid();
+                .execute();
 
         assertEquals(201, response.getStatusCode());
     }
@@ -67,7 +67,7 @@ public class TestWebb_UpDownload extends AbstractTestWebb {
         Response<Void> response = webb
                 .post("/upload?stream")
                 .body(inputStream)
-                .asVoid();
+                .execute();
 
         inputStream.close();
 
@@ -82,7 +82,7 @@ public class TestWebb_UpDownload extends AbstractTestWebb {
                 .post("/upload-compressed")
                 .compress()
                 .body(TEST_FILE)
-                .asVoid();
+                .execute();
 
         assertEquals(201, response.getStatusCode());
     }
@@ -93,7 +93,7 @@ public class TestWebb_UpDownload extends AbstractTestWebb {
 
         Response<byte[]> response = webb
                 .post("/echoBin") //force-content-encoding
-                .header(Webb.HDR_ACCEPT_ENCODING, "gzip")
+                .header(WebbConst.HDR_ACCEPT_ENCODING, "gzip")
                 .compress()
                 .body(payload)
                 .asBytes();
@@ -146,7 +146,7 @@ public class TestWebb_UpDownload extends AbstractTestWebb {
 
         Response<JSONArray> response = webb
                 .get("/compressed.json")
-                .header(Webb.HDR_ACCEPT_ENCODING, "gzip")
+                .header(WebbConst.HDR_ACCEPT_ENCODING, "gzip")
                 .asJsonArray();
 
         assertEquals(200, response.getStatusCode());
@@ -157,7 +157,7 @@ public class TestWebb_UpDownload extends AbstractTestWebb {
 
         Response<JSONArray> response = webb
                 .get("/compressed.json")
-                .header(Webb.HDR_ACCEPT_ENCODING, "deflate")
+                .header(WebbConst.HDR_ACCEPT_ENCODING, "deflate")
                 .asJsonArray();
 
         assertEquals(200, response.getStatusCode());
@@ -167,7 +167,7 @@ public class TestWebb_UpDownload extends AbstractTestWebb {
     public void testDownloadUnknownEncoding() throws Exception {
         Request request = webb
                 .get("/compressed.json")
-                .header(Webb.HDR_ACCEPT_ENCODING, "unknown");
+                .header(WebbConst.HDR_ACCEPT_ENCODING, "unknown");
 
         try {
             Response<byte[]> response = request.asBytes();
@@ -179,7 +179,7 @@ public class TestWebb_UpDownload extends AbstractTestWebb {
     }
 
     public void testEchoBytes() throws Exception {
-        byte[] msg = (SIMPLE_ASCII + ", " + COMPLEX_UTF8).getBytes(Const.UTF8);
+        byte[] msg = (SIMPLE_ASCII + ", " + COMPLEX_UTF8).getBytes(WebbConst.UTF8);
         Response<byte[]> response = webb
                 .post("/echoBin")
                 .body(msg)
@@ -189,7 +189,7 @@ public class TestWebb_UpDownload extends AbstractTestWebb {
     }
 
     public void testEchoAsStream() throws Exception {
-        byte[] msg = (SIMPLE_ASCII + ", " + COMPLEX_UTF8).getBytes(Const.UTF8);
+        byte[] msg = (SIMPLE_ASCII + ", " + COMPLEX_UTF8).getBytes(WebbConst.UTF8);
         Response<InputStream> response = webb
                 .post("/echoBin")
                 .body(msg)

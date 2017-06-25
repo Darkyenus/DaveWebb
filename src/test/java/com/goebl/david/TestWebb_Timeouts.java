@@ -8,7 +8,7 @@ public class TestWebb_Timeouts extends AbstractTestWebb {
         // throw away artifact under test and create new
         webb = Webb.create();
         try {
-            webb.get("http://www.goebl.com/robots.txt").connectTimeout(11).asVoid();
+            webb.get("http://www.goebl.com/robots.txt").connectTimeout(11).execute();
         } catch (WebbException e) {
             assertEquals(SocketTimeoutException.class, e.getCause().getClass());
         }
@@ -19,7 +19,7 @@ public class TestWebb_Timeouts extends AbstractTestWebb {
         Webb.setConnectTimeout(11);
         webb = Webb.create();
         try {
-            webb.get("http://www.goebl.com/robots.txt").asVoid();
+            webb.get("http://www.goebl.com/robots.txt").execute();
         } catch (WebbException e) {
             assertEquals(SocketTimeoutException.class, e.getCause().getClass());
         } finally {
@@ -32,7 +32,7 @@ public class TestWebb_Timeouts extends AbstractTestWebb {
         Webb.setConnectTimeout(11);
         webb = Webb.create();
         try {
-            webb.get("http://www.goebl.com/robots.txt").connectTimeout(10000).asVoid();
+            webb.get("http://www.goebl.com/robots.txt").connectTimeout(10000).execute();
         } catch (WebbException e) {
             fail("no exception expected (only if server is down), but is: " + e);
         } finally {

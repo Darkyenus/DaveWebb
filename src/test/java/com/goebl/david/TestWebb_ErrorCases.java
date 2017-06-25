@@ -6,7 +6,7 @@ public class TestWebb_ErrorCases extends AbstractTestWebb {
 
     public void testGetWithBody() throws Exception {
         try {
-            webb.get("/does_not_exist").body("some text").asVoid();
+            webb.get("/does_not_exist").body("some text").execute();
             fail();
         } catch (IllegalStateException expected) {
             // body with get is not allowed
@@ -15,7 +15,7 @@ public class TestWebb_ErrorCases extends AbstractTestWebb {
 
     public void testDeleteWithBody() throws Exception {
         try {
-            webb.delete("/does_not_exist").body("some text").asVoid();
+            webb.delete("/does_not_exist").body("some text").execute();
             fail();
         } catch (IllegalStateException expected) {
             // body with get is not allowed
@@ -24,7 +24,7 @@ public class TestWebb_ErrorCases extends AbstractTestWebb {
 
     public void testUriNull() throws Exception {
         try {
-            webb.get(null).asVoid();
+            webb.get(null).execute();
             fail();
         } catch (IllegalArgumentException expected) {
             // body with get is not allowed
@@ -38,7 +38,7 @@ public class TestWebb_ErrorCases extends AbstractTestWebb {
 
         assertFalse(response.isSuccess());
         assertEquals(404, response.getStatusCode());
-        assertEquals("Not Found", response.getResponseMessage());
+        assertEquals("Not Found", response.getStatusMessage());
         assertNull(response.getBody());
         assertEquals(String.class, response.getErrorBody().getClass());
     }

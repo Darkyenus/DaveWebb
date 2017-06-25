@@ -89,7 +89,7 @@ public class TestWebbUtils_Mock extends TestCase {
 
         assertArrayEquals("abc=123&email=abc%40def.com".getBytes("UTF-8"), payload);
         verify(connection).setFixedLengthStreamingMode(payload.length);
-        verify(connection).addRequestProperty(Const.HDR_CONTENT_TYPE, Const.APP_FORM);
+        verify(connection).addRequestProperty(WebbConst.HDR_CONTENT_TYPE, WebbConst.MIME_URLENCODED);
     }
 
     public void testGetPayloadAsBytesAndSetContentType_null() throws Exception {
@@ -101,7 +101,7 @@ public class TestWebbUtils_Mock extends TestCase {
 
         assertNull(payload);
         verify(connection, never()).setFixedLengthStreamingMode(anyInt());
-        verify(connection, never()).addRequestProperty(eq(Const.HDR_CONTENT_TYPE), anyString());
+        verify(connection, never()).addRequestProperty(eq(WebbConst.HDR_CONTENT_TYPE), anyString());
     }
 
     public void testGetPayloadAsBytesAndSetContentType_JSONObject() throws Exception {
@@ -121,7 +121,7 @@ public class TestWebbUtils_Mock extends TestCase {
 
         assertArrayEquals(expected, payload);
         verify(connection).setFixedLengthStreamingMode(expected.length);
-        verify(connection).addRequestProperty(Const.HDR_CONTENT_TYPE, Const.APP_JSON);
+        verify(connection).addRequestProperty(WebbConst.HDR_CONTENT_TYPE, WebbConst.MIME_JSON);
     }
 
     public void testGetPayloadAsBytesAndSetContentType_JSONArray() throws Exception {
@@ -140,7 +140,7 @@ public class TestWebbUtils_Mock extends TestCase {
 
         assertArrayEquals(expected, payload);
         verify(connection).setFixedLengthStreamingMode(expected.length);
-        verify(connection).addRequestProperty(Const.HDR_CONTENT_TYPE, Const.APP_JSON);
+        verify(connection).addRequestProperty(WebbConst.HDR_CONTENT_TYPE, WebbConst.MIME_JSON);
     }
 
     public void testGetPayloadAsBytesAndSetContentType_String() throws Exception {
@@ -154,7 +154,7 @@ public class TestWebbUtils_Mock extends TestCase {
 
         assertArrayEquals(expected, payload);
         verify(connection).setFixedLengthStreamingMode(expected.length);
-        verify(connection).addRequestProperty(Const.HDR_CONTENT_TYPE, Const.TEXT_PLAIN);
+        verify(connection).addRequestProperty(WebbConst.HDR_CONTENT_TYPE, WebbConst.MIME_TEXT_PLAIN);
     }
 
     public void testGetPayloadAsBytesAndSetContentType_bytes() throws Exception {
@@ -168,7 +168,7 @@ public class TestWebbUtils_Mock extends TestCase {
 
         assertArrayEquals(expected, payload);
         verify(connection).setFixedLengthStreamingMode(expected.length);
-        verify(connection).addRequestProperty(Const.HDR_CONTENT_TYPE, Const.APP_BINARY);
+        verify(connection).addRequestProperty(WebbConst.HDR_CONTENT_TYPE, WebbConst.MIME_BINARY);
     }
 
     public void testParseResponseBody() throws Exception {
@@ -185,7 +185,7 @@ public class TestWebbUtils_Mock extends TestCase {
         response = mock(Response.class);
 
         payload.reset();
-        WebbUtils.parseResponseBody(Const.BYTE_ARRAY_CLASS, response, payload);
+        WebbUtils.parseResponseBody(WebbConst.BYTE_ARRAY_CLASS, response, payload);
         verify(response).setBody(payloadInBytes);
 
         // void
@@ -208,22 +208,22 @@ public class TestWebbUtils_Mock extends TestCase {
         WebbUtils.parseErrorResponse(String.class, null, null); // without NPE it's OK!
         assertNull(response.errorBody);
         when(connection.getContentType()).thenReturn(
-                Const.APP_BINARY, // 1
+                WebbConst.MIME_BINARY, // 1
                 null,             // 2
-                Const.APP_JSON,   // 3
-                Const.APP_JSON,   // 4
+                WebbConst.MIME_JSON,   // 3
+                WebbConst.MIME_JSON,   // 4
                 "text/plain; charset=UTF-8");    // 5
 
 
         // (1) we expect a byte[] and Content-Type = app/bin => should be byte[]
-        WebbUtils.parseErrorResponse(Const.BYTE_ARRAY_CLASS, response, payload);
+        WebbUtils.parseErrorResponse(WebbConst.BYTE_ARRAY_CLASS, response, payload);
         assertNotNull(response.errorBody);
         assertArrayEquals(payloadInBytes, (byte[]) response.errorBody);
         response.errorBody = null;
 
         payload.reset();
         // (2) we expect a byte[] and Content-Type is null => should be byte[]
-        WebbUtils.parseErrorResponse(Const.BYTE_ARRAY_CLASS, response, payload);
+        WebbUtils.parseErrorResponse(WebbConst.BYTE_ARRAY_CLASS, response, payload);
         assertNotNull(response.errorBody);
         assertArrayEquals(payloadInBytes, (byte[]) response.errorBody);
         response.errorBody = null;
@@ -232,7 +232,7 @@ public class TestWebbUtils_Mock extends TestCase {
         // (3) we expect a String and Content-Type is JSON => should be String
         JSONObject jsonObject = new JSONObject();
         jsonObject.put("msg", expected);
-        payload = new ByteArrayInputStream(jsonObject.toString().getBytes(Const.UTF8));
+        payload = new ByteArrayInputStream(jsonObject.toString().getBytes(WebbConst.UTF8));
         WebbUtils.parseErrorResponse(String.class, response, payload);
         assertNotNull(response.errorBody);
         assertEquals(jsonObject.toString(), (String) response.errorBody);

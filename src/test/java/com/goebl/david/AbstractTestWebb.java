@@ -26,7 +26,7 @@ public abstract class AbstractTestWebb extends TestCase {
                 ? (isEmulator() ? "10.0.2.2" : HOST_IP)
                 : "localhost";
 
-        Webb.setGlobalHeader(Webb.HDR_USER_AGENT, Webb.DEFAULT_USER_AGENT);
+        Webb.setGlobalHeader(WebbConst.HDR_USER_AGENT, WebbConst.DEFAULT_USER_AGENT);
         webb = Webb.create();
         webb.setBaseUri("http://" + host + ":3003");
     }

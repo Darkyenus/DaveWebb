@@ -5,9 +5,9 @@ package com.goebl.david;
  *
  * @author hgoebl
  */
-public class WebbException extends RuntimeException {
+public final class WebbException extends RuntimeException {
 
-    private Response response;
+    Response response;
 
     public WebbException(String message) {
         super(message);
@@ -28,7 +28,7 @@ public class WebbException extends RuntimeException {
 
     /**
      * Get the Response object
-     * (only available if exception has been raised by {@link com.goebl.david.Request#ensureSuccess()}.
+     * (only available if exception has been raised when the response was already known.
      *
      * @return the <code>Response</code> object filled with error information like statusCode and errorBody.
      */
