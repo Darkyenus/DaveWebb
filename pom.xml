@@ -3,13 +3,13 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>com.darkyen</groupId>
-    <artifactId>david-webb</artifactId>
-    <version>1.4.0-SNAPSHOT</version>
+    <artifactId>dave-webb</artifactId>
+    <version>1.0-SNAPSHOT</version>
     <packaging>jar</packaging>
 
-    <name>DavidWebb</name>
+    <name>DaveWebb</name>
     <description>Lightweight Java HTTP-Client for calling REST-Services</description>
-    <url>https://github.com/Darkyenus/DavidWebb</url>
+    <url>https://github.com/Darkyenus/DaveWebb</url>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -67,7 +67,7 @@
 
     <issueManagement>
         <system>Github Issues</system>
-        <url>https://github.com/Darkyenus/DavidWebb/issues</url>
+        <url>https://github.com/Darkyenus/DaveWebb/issues</url>
     </issueManagement>
 
     <build>

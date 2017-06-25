@@ -1,8 +1,8 @@
-# DavidWebb
+# DaveWebb
 
 Lightweight Java HTTP-Client for calling REST-Services
 
-## Problem
+## Problem ##
 
 If you have to call a RESTful Webservice from Java, especially if you are on Android, you have some options:
 
@@ -11,13 +11,13 @@ If you have to call a RESTful Webservice from Java, especially if you are on And
    [Google doesn't recommend using it](http://android-developers.blogspot.de/2011/09/androids-http-clients.html),
    only on very old Android versions.
  * Use `HttpURLConnection`. This is what Google recommends for newer Android versions (>= Gingerbread).
-   It is part of JDK, but it's cumbersome to use (if not to say a nightmare).
+   It is part of JDK, but it's cumbersome to use.
  * Add `Unirest`, `Restlet` or some other "all-you-can-eat", universal, multi-part, File-upload and all-cases
    supporting library which adds some hundred KB of jars to your APK.
 
-## Solved
+## Solved ##
 
-**DavidWebb** is a paper-thin wrapper around
+**DaveWebb** is a paper-thin wrapper around
 [HttpURLConnection](http://docs.oracle.com/javase/7/docs/api/java/net/HttpURLConnection.html).
 It supports most HTTP communication cases when you talk to REST services. It is very
 lightweight (~18 KB jar) and super-easy to use.
@@ -33,48 +33,28 @@ lightweight (~18 KB jar) and super-easy to use.
   * GZip-compression for uploads (POST/PUT)
   * Un-compress gzip/deflate downloads
   * supports HTTPS and enables relaxing SSL-handshake (self-signed certificates, hostname verification)
-  * pass-through to "real" connection for special cases
   * option to retry the request in case of special errors (503, 504, 'connection reset by peer')
-  * multi-valued parameters (since 1.3.0)
-  * use streams as input and output (automatically closing underlying HttpURLConnection when stream
-    is closed, since 1.3.0)
-
-## Non-Features ##
-
-Following features are not supported and there are no plans to realize them:
-
-  * JSON Support
-  * Cookie management (read `Set-Cookie` header from response and set `Cookie` header for request).
-    As DavidWebb is just a thin wrapper over HttpURLConnection, you can use `CookieManager`.
-  * Comfortable Basic Authentication (it's not hard to implement it above of DavidWebb, see below)
-  * Multi-Part upload
-  * Mixing URL-parameters and x-www-form-urlencoded POST bodies.<br>
-    Workaround: build the URI with the help of `WebbUtils.queryString` and use `Request.param()` for
-    the form-fields.
-
-Where not stated, the workaround is to use another library or implement it above of DavidWebb.
-If you think your implementation might be useful for others and it's not blowing up the size of
-the JAR, please create a pull request. (Adding heavy dependencies is not an option.)
+  * multi-valued parameters
+  * use streams as input and output
+  
+Philosophy: *Do essentials right and nothing else*
 
 # Usage Examples
 
-Below you can see some examples of how to use DavidWebb.
-
-**This is some code from a SyncAdapter of an Android App:**
-
 ```java
-// create the client (one-time, can be used from different threads)
-Webb webb = Webb.create();
-webb.setBaseUri(SyncPreferences.REST_ENDPOINT);
+// create the client settings bundle (one-time, can be used from different threads)
+Webb webb = new Webb(SyncPreferences.REST_ENDPOINT);
 webb.setDefaultHeader(Webb.HDR_USER_AGENT, Const.UA);
 
 // later we authenticate
 Response<JSONObject> response = webb
-        .post("/session")
-        .param("authentication", createAuthentication(syncPreferences))
-        .param("deviceId", syncPreferences.getDeviceId())
-        .ensureSuccess()
-        .asJsonObject();
+        .post("/session") // We POST to relative URI /session
+        .param("authentication", createAuthentication(syncPreferences)) // With urlencoded params authentication...
+        .param("deviceId", syncPreferences.getDeviceId()) // ... and deviceId
+        .ensureSuccess() // We'd like to get exception instead of non 2XX response
+        .execute(JSON_TRANSLATOR); // And finally, do the REST call. Translate what is returned to Json.
+// Note: JSON_TRANSLATOR is not included by default, because we don't have any json dependency.
+// Our tests however do, so you can see how to write such translator yourself.
 
 JSONObject apiResult = response.getBody();
 
@@ -87,20 +67,20 @@ webb.setDefaultHeader(HDR_ACCESS_TOKEN, accessToken.token);
 JSONObject sync = webb.post("/startSync")
         .param("lastSync", syncPreferences.getLastSync())
         .ensureSuccess()
-        .asJsonObject()
+        .execute(JSON_TRANSLATOR)
         .getBody();
 
 // ... etc. etc.
 
 // releaseAccessToken
-webb.delete("/session").asVoid();
+webb.delete("/session").execute();
 accessToken = null;
 ```
 
 **Using Google Directions API:**
 
 ```java
-Webb webb = Webb.create();
+Webb webb = new Webb();
 JSONObject result = webb
         .get("http://maps.googleapis.com/maps/api/directions/json")
         .param("origin", new GeoPoint(47.8227, 12.096933))
@@ -108,7 +88,7 @@ JSONObject result = webb
         .param("mode", "walking")
         .param("sensor", "true")
         .ensureSuccess()
-        .asJsonObject()
+        .execute(JSON_TRANSLATOR)
         .getBody();
 
 JSONArray routes = result.getJSONArray("routes");
@@ -126,26 +106,12 @@ Webb webb = Webb.create();
 JSONObject result = webb
         .get("https://example.com/api/request")
         .retry(1, false) // at most one retry, don't do exponential backoff
-        .asJsonObject()
+        .executeString()
         .getBody();
 ```
 
 In many cases you will need to change the behaviour of how and when to retry a request.
 For this, you can register your own `RetryManager`, see `webb.setRetryManager()`.
-
-**You have to do Basic Authentication?**
-
-This authorization method uses a Base64 encoded string. Unfortunately Java SE doesn't provide a
-Base64 encoder. Because DavidWebb wants to be light and Android already provides a Base64 support class,
-it's left to you to insert a few lines of code. As you can see, it's not hard work.
-Use one of the methods to set a header and set Authorization header by yourself:
-
-```java
-byte[] credentials = (username + ":" + password).getBytes("UTF-8");
-String auth = "Basic " + Base64.encodeToString(credentials, 0);
-Webb webb = Webb.create();
-webb.setDefaultHeader(Webb.HDR_AUTHORIZATION, auth);
-```
 
 **More Samples**
 
@@ -174,60 +140,12 @@ webb.setDefaultHeader("Connection", "close");
 // disable only for this request
 Request<String> request = webb.post("/some-resource").header("Connection", "close");
 ```
-# Maven Coordinates
-
-```xml
-<dependency>
-    <groupId>com.goebl</groupId>
-    <artifactId>david-webb</artifactId>
-    <version>1.3.0</version>
-</dependency>
-```
-
-Gradle
-
-    'com.goebl:david-webb:1.3.0'
-
-Not using Maven/Gradle? - Then you can download the plain JAR from following links directly:
-
- * [SNAPSHOT Versions](https://oss.sonatype.org/content/groups/staging/com/goebl/david-webb/)
- * [RELEASE Versions](http://repo.maven.apache.org/maven2/com/goebl/david-webb/)
 
 # Background
 
-## Not for you?
-
-If **DavidWebb** is too lightweight and you're missing features, you can have a look at:
-
-  * [OkHttp](http://square.github.io/okhttp/) An HTTP & SPDY client for Android and Java applications
-  * [Volley](https://developer.android.com/training/volley/index.html) is an HTTP library that makes networking for
-    Android apps easier and most importantly, faster.
-  * [basic-http-client](https://code.google.com/p/basic-http-client/)
-    Basic HTTP client w/ Android AsyncTask wrapper
-  * [RESTDroid](https://github.com/PCreations/RESTDroid)
-    Resource oriented REST client for Android
-  * [RoboSpice](https://github.com/octo-online/robospice)
-    RoboSpice is a modular android library that makes writing asynchronous network requests easy!
-  * [android-rest-client](https://github.com/darko1002001/android-rest-client)
-    A simple rest API client library
-  * [unirest](http://unirest.io/)
-    Lightweight HTTP Request Library
-  * [Restlet Framework](http://restlet.org/)
-    The leading web API framework for Java
-  * [DataDroid](http://datadroid.foxykeep.com/) - an Android library for Data Management
-  * [google-http-java-client](https://github.com/google/google-http-java-client) Google HTTP Client Library for Java
-  * [More Alternatives (on RoboSpice)](https://github.com/octo-online/robospice#alternatives-to-robospice-)
-  * (tell me if I missed your award-winning REST-client library!)
-
-## The Name!?
-
-David **Webb** is the real name of **Jason** Bourne. So **JSON** and **Web**, did you get it?
-OK, might be silly, but Bourne 1-3 are my favorite films and so at least I can remember the name.
-
-From Wikipedia:
-
-> [Jason Bourne](http://en.wikipedia.org/wiki/Jason_Bourne) is a fictional character and the protagonist
-of a series of novels by Robert Ludlum and subsequent film adaptations
+This library started as a fork of well written [DavidWebb](https://github.com/hgoebl/DavidWebb) - check it out!
+Some features were then removed (JSON) and some added (Async).
+Name has been changed slightly to prevent confusion with original and incompatible library.
 
 # License
 
@@ -253,27 +171,3 @@ set the timezone of your emulator to the same as your PC and synchronize date/ti
 otherwise some tests will fail:
 
 There is a script (`src/test/android/run-tests-emulator.sh`) which also builds the test-app with gradle.
-
-# TODO
-
-## Features (planned)
-  * support char-sets other than UTF-8
-  * unprefixJson <http://haacked.com/archive/2008/11/20/anatomy-of-a-subtle-json-vulnerability.aspx>
-  * progress callback during POST requests where size is known in advance
-  * Support for PATCH requests (only when OkHttp is used as a replacement for HttpURLConnection)
-
-## Features (only ideas)
-  * provide base classes (or only examples) for using DavidWebb together with `AsyncTask`
-  * decorator/interceptor beforeSend - provide hooks to manipulate request before send
-  * decorator/interceptor afterReceive - provide hooks to manipulate raw response after receiving it
-
-Create an issue if you want to have one of those ideas implemented.
-
-
-## Testing
-  * Higher coverage
-  * Test against httpbin.org
-
-# Contributors
- * [essobedo](https://github.com/essobedo)
- * [Darkyenus](https://github.com/Darkyenus)
