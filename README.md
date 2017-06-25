@@ -1,4 +1,6 @@
 # DaveWebb
+[![](https://jitpack.io/v/Darkyenus/DaveWebb.svg)](https://jitpack.io/#Darkyenus/DaveWebb)
+
 
 Lightweight Java HTTP-Client for calling REST-Services
 
