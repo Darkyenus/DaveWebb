@@ -45,10 +45,7 @@ public class RetryManager {
                 return true;
             }
         }
-        if (cause instanceof SocketTimeoutException) {
-            return true;
-        }
-        return false;
+        return cause instanceof SocketTimeoutException;
     }
 
     /**

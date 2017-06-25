@@ -17,7 +17,7 @@ import java.util.zip.GZIPOutputStream;
  *
  * @author hgoebl
  */
-@SuppressWarnings("WeakerAccess")
+@SuppressWarnings({"WeakerAccess", "unused"})
 public final class Webb {
 
     private final String baseUri;
@@ -220,7 +220,6 @@ public final class Webb {
 
     private <T> Response<T> _execute(Request request, ResponseTranslator<T> translator) {
         InputStream is = null;
-        boolean closeStream = true;
         HttpURLConnection connection = null;
 
         Response<T> response = null;

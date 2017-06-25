@@ -10,6 +10,8 @@ import java.util.TimeZone;
 public class TestWebb extends AbstractTestWebb {
 
     public void testMisc() throws Exception {
+        assertEquals(webb.getBaseUri(), uri());
+
         Request request = webb
                 .get("/ping")
                 .useCaches(true);

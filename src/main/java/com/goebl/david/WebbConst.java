@@ -3,6 +3,7 @@ package com.goebl.david;
 /**
  * Constant values and strings.
  */
+@SuppressWarnings({"WeakerAccess", "unused"})
 public final class WebbConst {
     private WebbConst() {
     }
@@ -24,7 +25,6 @@ public final class WebbConst {
     static final String UTF8 = "UTF-8";
 
     static final byte[] EMPTY_BYTE_ARRAY = new byte[0];
-    static final Class BYTE_ARRAY_CLASS = EMPTY_BYTE_ARRAY.getClass();
     /** Minimal number of bytes the compressed content must be smaller than uncompressed */
     static final int MIN_COMPRESSED_ADVANTAGE = 80;
 }

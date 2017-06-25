@@ -97,6 +97,7 @@ public final class Request {
             Object currentValue = params.get(name);
             if (currentValue != null) {
                 if (currentValue instanceof Collection) {
+                    //noinspection unchecked
                     Collection<Object> values = (Collection) currentValue;
                     values.add(value);
                 } else {

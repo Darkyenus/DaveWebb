@@ -67,7 +67,7 @@ public class TestWebb_ErrorCases extends AbstractTestWebb {
     public void testPostError500WithContent_JSON() throws Exception {
         Response<JsonValue> response = webb
                 .post("/error/500/with-content")
-                .body("This is some content")
+                .bodyJson("{\"arbitrary\":\"This is some content\"}")
                 .execute(JSON_TRANSLATOR);
 
         assertFalse(response.isSuccess());
