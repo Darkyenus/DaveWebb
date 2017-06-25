@@ -9,15 +9,11 @@ import java.util.Map;
 /**
  * Builder for an HTTP request.
  * <br>
- * You can some "real-life" usage examples at
- * <a href="https://github.com/hgoebl/DavidWebb">github.com/hgoebl/DavidWebb</a>.
- * <br>
- *
  * Most methods return this Request for chaining.
- *
- * @author hgoebl
+ * <br>
+ * Request itself is performed by execute-class of methods.
  */
-@SuppressWarnings("WeakerAccess")
+@SuppressWarnings({"WeakerAccess", "unused"})
 public final class Request {
 
     private final Webb webb;
@@ -431,7 +427,7 @@ public final class Request {
      * @return the created <code>Response</code> object carrying the payload from the server as <code>String</code>
      */
     public Response<String> executeString() {
-        return webb.execute(this, ResponseTranslator.STRING_TRANSLATOR);
+        return execute(ResponseTranslator.STRING_TRANSLATOR);
     }
 
     /**
@@ -439,7 +435,7 @@ public final class Request {
      * @return the created <code>Response</code> object carrying the payload from the server as <code>byte[]</code>
      */
     public Response<byte[]> executeBytes() {
-        return webb.execute(this, ResponseTranslator.BYTES_TRANSLATOR);
+        return execute(ResponseTranslator.BYTES_TRANSLATOR);
     }
 
     /**
@@ -447,6 +443,26 @@ public final class Request {
      * @return the created <code>Response</code> object where no payload is expected or simply will be ignored.
      */
     public Response<Void> execute() {
-        return webb.execute(this, null);
+        return execute((ResponseTranslator<Void>) null);
+    }
+
+    /** Execute the request with given translator and using Webb's executionStrategy. */
+    public <T> void execute(ResponseTranslator<T> translator, ResponseCallback<T> callback) {
+        webb.executionStrategy.execute(this, translator, callback);
+    }
+
+    /** Execute the request with String translator and using Webb's executionStrategy. */
+    public void executeString(ResponseCallback<String> callback) {
+        execute(ResponseTranslator.STRING_TRANSLATOR, callback);
+    }
+
+    /** Execute the request with byte[] translator and using Webb's executionStrategy. */
+    public void executeBytes(ResponseCallback<byte[]> callback) {
+        execute(ResponseTranslator.BYTES_TRANSLATOR, callback);
+    }
+
+    /** Execute the request without any translator and using Webb's executionStrategy. */
+    public void execute(ResponseCallback<Void> callback) {
+        execute(null, callback);
     }
 }

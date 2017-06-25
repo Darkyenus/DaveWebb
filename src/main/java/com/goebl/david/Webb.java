@@ -31,6 +31,8 @@ public final class Webb {
     private HostnameVerifier hostnameVerifier = null;
     private RetryManager retryManager = RetryManager.DEFAULT;
 
+    ExecutionStrategy executionStrategy = ExecutionStrategy.SYNCHRONOUS_EXECUTION_STRATEGY;
+
     /**
      * @param baseUri For all requests this value is taken as a kind of prefix for the effective URI, so you can address
      *                  the URIs relatively. null means no prefix.
@@ -128,6 +130,18 @@ public final class Webb {
     public void setRetryManager(RetryManager retryManager) {
         if (retryManager == null) throw new NullPointerException("retryManager");
         this.retryManager = retryManager;
+    }
+
+    /**
+     * Change strategy of asynchronous request execution.
+     *
+     * Default strategy is {@link ExecutionStrategy#SYNCHRONOUS_EXECUTION_STRATEGY}, which is not async at all.
+     *
+     * @param executionStrategy not null
+     */
+    public void setExecutionStrategy(ExecutionStrategy executionStrategy) {
+        if (executionStrategy == null) throw new NullPointerException("executionStrategy");
+        this.executionStrategy = executionStrategy;
     }
 
     /**
