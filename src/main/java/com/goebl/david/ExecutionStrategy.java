@@ -107,7 +107,7 @@ public interface ExecutionStrategy {
             private volatile boolean keepRunning = true;
 
             public AsyncThread(int order) {
-                setName(getClass().getSimpleName()+" - "+order);
+                setName("AsyncThread - "+order);
                 setDaemon(true);
                 start();
             }
@@ -115,29 +115,34 @@ public interface ExecutionStrategy {
             @Override
             public void run() {
                 while (keepRunning) {
-                    final AsyncTask task;
+                    try {
+                        final AsyncTask task;
 
-                    if (shutdown) {
-                        task = taskQueue.poll();
-                        if (task == null) {
+                        if (shutdown) {
+                            task = taskQueue.poll();
+                            if (task == null) {
+                                return;
+                            }
+                        } else {
+                            try {
+                                task = taskQueue.take();
+                            } catch (InterruptedException ignored) {
+                                continue;
+                            }
+                        }
+
+                        final Response response;
+                        try {
+                            response = task.request.execute(task.translator);
+                        } catch (WebbException e) {
+                            callFailure(task.callback, e);
                             return;
                         }
-                    } else {
-                        try {
-                            task = taskQueue.take();
-                        } catch (InterruptedException ignored) {
-                            continue;
-                        }
+                        callSuccess(task.callback, response);// Do not catch exceptions in callback
+                    } catch (Throwable ex) {
+                        System.err.println("ExecutionStrategy.Async - failure inside "+getName());
+                        ex.printStackTrace(System.err);
                     }
-
-                    final Response response;
-                    try {
-                        response = task.request.execute(task.translator);
-                    } catch (WebbException e) {
-                        callFailure(task.callback, e);
-                        return;
-                    }
-                    callSuccess(task.callback, response);// Do not catch exceptions in callback
                 }
             }
 
