@@ -34,7 +34,7 @@ public final class Response<T> {
 
         this.statusCode = connection.getResponseCode();
         this.statusMessage = connection.getResponseMessage();
-        this.statusLine = connection.getHeaderField(0);
+        this.statusLine = connection.getHeaderField(null);
 
         this.headers = connection.getHeaderFields();
         this.contentType = connection.getContentType();
