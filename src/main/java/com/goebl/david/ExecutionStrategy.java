@@ -136,7 +136,7 @@ public interface ExecutionStrategy {
                             response = task.request.execute(task.translator);
                         } catch (WebbException e) {
                             callFailure(task.callback, e);
-                            return;
+                            continue;
                         }
                         callSuccess(task.callback, response);// Do not catch exceptions in callback
                     } catch (Throwable ex) {
