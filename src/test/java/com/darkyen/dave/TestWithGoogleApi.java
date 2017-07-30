@@ -1,4 +1,4 @@
-package com.goebl.david;
+package com.darkyen.dave;
 
 import com.esotericsoftware.jsonbeans.JsonValue;
 import junit.framework.TestCase;

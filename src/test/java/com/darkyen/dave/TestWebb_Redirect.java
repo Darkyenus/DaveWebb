@@ -1,4 +1,4 @@
-package com.goebl.david;
+package com.darkyen.dave;
 
 public class TestWebb_Redirect extends AbstractTestWebb {
 

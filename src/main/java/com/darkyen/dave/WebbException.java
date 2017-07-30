@@ -1,4 +1,4 @@
-package com.goebl.david;
+package com.darkyen.dave;
 
 /**
  * Runtime exception wrapping the real exception thrown by HttpUrlConnection et al.

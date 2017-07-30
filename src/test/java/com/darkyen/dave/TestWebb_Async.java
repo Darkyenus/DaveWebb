@@ -1,4 +1,4 @@
-package com.goebl.david;
+package com.darkyen.dave;
 
 import java.util.concurrent.CountDownLatch;
 

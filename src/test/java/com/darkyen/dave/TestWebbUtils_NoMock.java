@@ -1,4 +1,4 @@
-package com.goebl.david;
+package com.darkyen.dave;
 
 import junit.framework.TestCase;
 

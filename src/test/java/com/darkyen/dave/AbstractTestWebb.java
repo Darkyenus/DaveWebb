@@ -1,4 +1,4 @@
-package com.goebl.david;
+package com.darkyen.dave;
 
 import com.esotericsoftware.jsonbeans.JsonReader;
 import com.esotericsoftware.jsonbeans.JsonValue;
@@ -58,7 +58,7 @@ public abstract class AbstractTestWebb extends TestCase {
 
     static ResponseTranslator<JsonValue> JSON_TRANSLATOR = new ResponseTranslator<JsonValue>() {
         public JsonValue decode(Response response, InputStream in) throws Exception {
-            final String text = ResponseTranslator.STRING_TRANSLATOR.decode(response, in);
+            final String text = STRING_TRANSLATOR.decode(response, in);
             return new JsonReader().parse(text);
         }
 

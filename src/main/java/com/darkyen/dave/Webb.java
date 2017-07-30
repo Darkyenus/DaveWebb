@@ -1,4 +1,4 @@
-package com.goebl.david;
+package com.darkyen.dave;
 
 import java.io.*;
 
@@ -55,7 +55,7 @@ public final class Webb {
      * <br>
      * Default timeout is 10 seconds.
      * <br>
-     * Can be overwritten for each Request with {@link com.goebl.david.Request#connectTimeout(int)}.
+     * Can be overwritten for each Request with {@link Request#connectTimeout(int)}.
      * @param connectTimeout the new timeout or <code>&lt;= 0</code> to disable timeouts.
      */
     public void setConnectTimeout(int connectTimeout) {
@@ -67,7 +67,7 @@ public final class Webb {
      * <br>
      * Default timeout is 3 minutes.
      * <br>
-     * Can be overwritten for each Request with {@link com.goebl.david.Request#readTimeout(int)}.
+     * Can be overwritten for each Request with {@link Request#readTimeout(int)}.
      * @param readTimeout the new timeout or <code>&lt;= 0</code> to disable timeouts.
      */
     public void setReadTimeout(int readTimeout) {
@@ -109,7 +109,7 @@ public final class Webb {
      * Set the value for a named header which is valid for all requests created by this instance.
      * <br>
      * The value can be overwritten by
-     * {@link com.goebl.david.Request#header(String, Object)}.
+     * {@link Request#header(String, Object)}.
      * <br>
      * For the supported types for values see {@link Request#header(String, Object)}.
      *
@@ -117,7 +117,7 @@ public final class Webb {
      * @param value value of the header. If <code>null</code> the header value is cleared (effectively not set).
      *              When setting the value to null, a value from global headers can shine through.
      *
-     * @see com.goebl.david.Request#header(String, Object)
+     * @see Request#header(String, Object)
      */
     public void setDefaultHeader(String name, Object value) {
         if (defaultHeaders == null) {
@@ -131,7 +131,7 @@ public final class Webb {
     }
 
     /**
-     * Registers an alternative {@link com.goebl.david.RetryManager}.
+     * Registers an alternative {@link RetryManager}.
      * @param retryManager the new manager for deciding whether it makes sense to retry a request. Not null.
      */
     public void setRetryManager(RetryManager retryManager) {

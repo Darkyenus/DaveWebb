@@ -1,4 +1,4 @@
-package com.goebl.david;
+package com.darkyen.dave;
 
 import java.io.IOException;
 import java.net.HttpURLConnection;
@@ -7,8 +7,6 @@ import java.text.ParseException;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
-
-import static com.goebl.david.WebbUtils.RFC1123_DATE_FORMAT;
 
 /**
  * Holds data about the response message returning from HTTP request.
@@ -192,8 +190,8 @@ public final class Response<T> {
         if (value == null) return defaultValue;
         try {
             final Date date;
-            synchronized (RFC1123_DATE_FORMAT) {
-                date = RFC1123_DATE_FORMAT.parse(value);
+            synchronized (WebbUtils.RFC1123_DATE_FORMAT) {
+                date = WebbUtils.RFC1123_DATE_FORMAT.parse(value);
             }
             if (date == null) {
                 return defaultValue;
@@ -214,7 +212,7 @@ public final class Response<T> {
     /**
      * A shortcut to check for successful status codes and throw exception in case of non-2xx status codes.
      * <br>
-     * In many cases you will call {@link com.goebl.david.Request#ensureSuccess()} instead of this method.
+     * In many cases you will call {@link Request#ensureSuccess()} instead of this method.
      * But there might be cases where you want to inspect the response-object first (check header values) and
      * then have a short exit where the response-code is not suitable for further normal processing.
      */
