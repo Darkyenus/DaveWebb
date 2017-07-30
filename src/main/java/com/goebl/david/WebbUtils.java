@@ -1,7 +1,7 @@
 package com.goebl.david;
 
 import java.io.*;
-import java.net.HttpURLConnection;
+import java.net.URLConnection;
 import java.net.URLEncoder;
 import java.text.SimpleDateFormat;
 import java.util.*;
@@ -116,7 +116,7 @@ final class WebbUtils {
         }
     }
 
-    static void addRequestProperties(HttpURLConnection connection, Map<String, Object> map) {
+    static void addRequestProperties(URLConnection connection, Map<String, Object> map) {
         if (map == null || map.isEmpty()) {
             return;
         }
@@ -125,7 +125,7 @@ final class WebbUtils {
         }
     }
 
-    static void addRequestProperty(HttpURLConnection connection, String name, Object value) {
+    static void addRequestProperty(URLConnection connection, String name, Object value) {
         if (name == null || name.length() == 0 || value == null) {
             throw new IllegalArgumentException("name and value must not be empty");
         }
@@ -146,7 +146,7 @@ final class WebbUtils {
         connection.addRequestProperty(name, valueAsString);
     }
 
-    static void ensureRequestProperty(HttpURLConnection connection, String name, Object value) {
+    static void ensureRequestProperty(URLConnection connection, String name, Object value) {
         if (!connection.getRequestProperties().containsKey(name)) {
             addRequestProperty(connection, name, value);
         }

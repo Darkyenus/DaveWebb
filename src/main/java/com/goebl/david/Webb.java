@@ -7,6 +7,7 @@ import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLSocketFactory;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.net.URLConnection;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -90,9 +91,15 @@ public final class Webb {
     }
 
     /**
-     * Returns the base URI of this instance.
+     * There are three modes of operation with base URI:
+     * 1. Base URI is null, all request paths must be absolute, including protocol.
+     * 2. Request path starts with "http://" or "https://", that path is taken as absolute, irregardless of what base URI is.
+     * 3. Otherwise: Final request path is concatenation of baseUri and given request path.
      *
-     * @return base URI
+     * Note that http and https are not the only protocols supported, the whole list depends on the platform.
+     * However, only http and https are recognized in mode 2.
+     *
+     * @return the base URI of this instance.
      */
     public String getBaseUri() {
         return baseUri;
@@ -146,8 +153,7 @@ public final class Webb {
 
     /**
      * Creates a <b>GET HTTP</b> request with the specified absolute or relative URI.
-     * @param pathOrUri the URI (will be concatenated with global URI or default URI without further checking).
-     *                  If it starts already with http:// or https:// this URI is taken and all base URIs are ignored.
+     * @param pathOrUri the URI - see {@link #getBaseUri()}
      * @return the created Request object (in fact it's more a builder than a real request object)
      */
     public Request get(String pathOrUri) {
@@ -156,8 +162,7 @@ public final class Webb {
 
     /**
      * Creates a <b>POST</b> HTTP request with the specified absolute or relative URI.
-     * @param pathOrUri the URI (will be concatenated with global URI or default URI without further checking)
-     *                  If it starts already with http:// or https:// this URI is taken and all base URIs are ignored.
+     * @param pathOrUri the URI - see {@link #getBaseUri()}
      * @return the created Request object (in fact it's more a builder than a real request object)
      */
     public Request post(String pathOrUri) {
@@ -166,8 +171,7 @@ public final class Webb {
 
     /**
      * Creates a <b>PUT</b> HTTP request with the specified absolute or relative URI.
-     * @param pathOrUri the URI (will be concatenated with global URI or default URI without further checking)
-     *                  If it starts already with http:// or https:// this URI is taken and all base URIs are ignored.
+     * @param pathOrUri the URI - see {@link #getBaseUri()}
      * @return the created Request object (in fact it's more a builder than a real request object)
      */
     public Request put(String pathOrUri) {
@@ -176,8 +180,7 @@ public final class Webb {
 
     /**
      * Creates a <b>DELETE</b> HTTP request with the specified absolute or relative URI.
-     * @param pathOrUri the URI (will be concatenated with global URI or default URI without further checking)
-     *                  If it starts already with http:// or https:// this URI is taken and all base URIs are ignored.
+     * @param pathOrUri the URI - see {@link #getBaseUri()}
      * @return the created Request object (in fact it's more a builder than a real request object)
      */
     public Request delete(String pathOrUri) {
@@ -188,10 +191,10 @@ public final class Webb {
         if (pathOrUri == null) {
             throw new IllegalArgumentException("pathOrUri must not be null");
         }
-        if (pathOrUri.startsWith("http://") || pathOrUri.startsWith("https://")) {
-            return pathOrUri;
-        }
         if (baseUri != null) {
+            if (pathOrUri.startsWith("http://") || pathOrUri.startsWith("https://")) {
+                return pathOrUri;
+            }
             return baseUri + pathOrUri;
         } else {
             return pathOrUri;
@@ -234,7 +237,8 @@ public final class Webb {
 
     private <T> Response<T> _execute(Request request, ResponseTranslator<T> translator) {
         InputStream is = null;
-        HttpURLConnection connection = null;
+        final URLConnection connection;
+        HttpURLConnection httpConnection = null;
 
         Response<T> response = null;
 
@@ -248,11 +252,16 @@ public final class Webb {
                 }
             }
             URL apiUrl = new URL(uri);
-            connection = (HttpURLConnection) apiUrl.openConnection();
+            connection = apiUrl.openConnection();
+            if (connection instanceof HttpURLConnection) {
+                httpConnection = (HttpURLConnection) connection;
+            }
 
             prepareSslConnection(connection);
-            connection.setRequestMethod(request.method.name());
-            connection.setInstanceFollowRedirects(request.followRedirects == null ? followRedirects : request.followRedirects);
+            if (httpConnection != null) {
+                httpConnection.setRequestMethod(request.method.name());
+                httpConnection.setInstanceFollowRedirects(request.followRedirects == null ? followRedirects : request.followRedirects);
+            }
             connection.setUseCaches(request.useCaches);
             connection.setConnectTimeout(request.connectTimeout == null ? connectTimeout : request.connectTimeout);
             connection.setReadTimeout(request.readTimeout == null ? readTimeout : request.readTimeout);
@@ -271,35 +280,38 @@ public final class Webb {
 
                     InputStream stream = payloadStream.createStream();
 
-                    if (request.compressPayload) {
-                        connection.setChunkedStreamingMode(-1); // use default chunk size
-                        connection.setRequestProperty(WebbConst.HDR_CONTENT_ENCODING, "gzip");
-                    } else {
-                        //noinspection unchecked
-                        final long length = payloadStream.payloadSize(stream);
-                        boolean lengthSet = false;
+                    if (httpConnection != null) {
+                        if (request.compressPayload) {
+                            httpConnection.setChunkedStreamingMode(-1); // use default chunk size
+                            httpConnection.setRequestProperty(WebbConst.HDR_CONTENT_ENCODING, "gzip");
+                        } else {
+                            //noinspection unchecked
+                            final long length = payloadStream.payloadSize(stream);
+                            boolean lengthSet = false;
 
-                        // - 8 just in case, values too close to close to MAX_VALUE may be buggy
-                        if (length > 0 && length <= Integer.MAX_VALUE - 8) {
-                            // This is fine, we can set this always
-                            connection.setFixedLengthStreamingMode((int)length);
-                            lengthSet = true;
-                        } else if (length > 0) {
-                            // This should be fine on newer implementations...
-                            try {
-                                //noinspection Since15
-                                connection.setFixedLengthStreamingMode(length);
+                            // - 8 just in case, values too close to close to MAX_VALUE may be buggy
+                            if (length > 0 && length <= Integer.MAX_VALUE - 8) {
+                                // This is fine, we can set this always
+                                httpConnection.setFixedLengthStreamingMode((int)length);
                                 lengthSet = true;
-                            } catch (NoSuchMethodError ignored) {
-                                // ... and this is not a new implementation
+                            } else if (length > 0) {
+                                // This should be fine on newer implementations...
+                                try {
+                                    //noinspection Since15
+                                    httpConnection.setFixedLengthStreamingMode(length);
+                                    lengthSet = true;
+                                } catch (NoSuchMethodError ignored) {
+                                    // ... and this is not a new implementation
+                                }
+                            }
+
+                            if (!lengthSet) {
+                                // Length can't be set normally, send it in parts
+                                httpConnection.setChunkedStreamingMode(-1); // use default chunk size
                             }
                         }
-
-                        if (!lengthSet) {
-                            // Length can't be set normally, send it in parts
-                            connection.setChunkedStreamingMode(-1); // use default chunk size
-                        }
                     }
+
 
                     connection.setDoOutput(true);
 
@@ -359,8 +371,8 @@ public final class Webb {
             // get the response body (if any)
             if (response.isSuccess()) {
                 is = connection.getInputStream();
-            } else {
-                is = connection.getErrorStream();
+            } else if (httpConnection != null) {
+                is = httpConnection.getErrorStream();
                 if (is == null) {
                     is = connection.getInputStream();
                 }
@@ -385,13 +397,13 @@ public final class Webb {
             throw exception;
         } finally {
             WebbUtils.closeQuietly(is);
-            if (connection != null) {
-                try { connection.disconnect(); } catch (Exception ignored) {}
+            if (httpConnection != null) {
+                try { httpConnection.disconnect(); } catch (Exception ignored) {}
             }
         }
     }
 
-    private void writeBody(HttpURLConnection connection, byte[] body) throws IOException {
+    private void writeBody(URLConnection connection, byte[] body) throws IOException {
         // Android StrictMode might complain about not closing the connection:
         // "E/StrictMode﹕ A resource was acquired at attached stack trace but never released"
         // It seems like some kind of bug in special devices (e.g. 4.0.4/Sony) but does not
@@ -410,7 +422,7 @@ public final class Webb {
         }
     }
 
-    private void prepareSslConnection(HttpURLConnection connection) {
+    private void prepareSslConnection(URLConnection connection) {
         if (connection instanceof HttpsURLConnection) {
             HttpsURLConnection sslConnection = (HttpsURLConnection) connection;
             if (hostnameVerifier != null) {

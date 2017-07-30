@@ -2,6 +2,7 @@ package com.goebl.david;
 
 import java.io.IOException;
 import java.net.HttpURLConnection;
+import java.net.URLConnection;
 import java.text.ParseException;
 import java.util.Date;
 import java.util.List;
@@ -29,11 +30,16 @@ public final class Response<T> {
 
     T body;
 
-    Response(Request request, HttpURLConnection connection) throws IOException {
+    Response(Request request, URLConnection connection) throws IOException {
         this.request = request;
 
-        this.statusCode = connection.getResponseCode();
-        this.statusMessage = connection.getResponseMessage();
+        if (connection instanceof HttpURLConnection) {
+            this.statusCode = ((HttpURLConnection)connection).getResponseCode();
+            this.statusMessage = ((HttpURLConnection)connection).getResponseMessage();
+        } else {
+            this.statusCode = 200;
+            this.statusMessage = "Non-http connection";
+        }
         this.statusLine = connection.getHeaderField(null);
 
         this.headers = connection.getHeaderFields();

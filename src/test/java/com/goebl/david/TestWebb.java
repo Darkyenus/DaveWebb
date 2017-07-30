@@ -1,6 +1,7 @@
 package com.goebl.david;
 
 
+import java.io.File;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.HashMap;
@@ -262,6 +263,16 @@ public class TestWebb extends AbstractTestWebb {
     public void testEnsureSuccess() throws Exception {
         String result = webb.get("/ping").ensureSuccess().executeString().getBody();
         assertEquals("pong", result);
+    }
+
+    public void testFileURL() throws Exception {
+        final File file = new File("src/test/TestFile.txt");
+        final String expectedFileContent = "Arbitrary\nContent!\n";
+
+        final Webb webb = new Webb(null);
+        final Response<String> response = webb.get(file.toURI().toString()).executeString();
+        assertEquals(response.getStatusCode(), 200);
+        assertEquals(response.getBody(), expectedFileContent);
     }
 
     // should be moved to TestRequest
